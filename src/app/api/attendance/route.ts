@@ -118,7 +118,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const calculations = calculateAttendance(inTime, outTime);
+    const cleanInTime = inTime.slice(0, 5);
+    const cleanOutTime = outTime.slice(0, 5);
+    const calculations = calculateAttendance(cleanInTime, cleanOutTime);
     const targetUserId = currentUser.role === "super_admin" && userId ? userId : currentUser.userId;
 
     // Check if attendance already exists
@@ -129,8 +131,8 @@ export async function POST(request: NextRequest) {
     if (existing.length > 0) {
       // Update existing
       const [updated] = await db.update(attendance).set({
-        inTime,
-        outTime,
+        inTime: cleanInTime,
+        outTime: cleanOutTime,
         workingHours: calculations.workingHours,
         lateMinutes: calculations.lateMinutes,
         overtimeMinutes: calculations.overtimeMinutes,
@@ -147,7 +149,7 @@ export async function POST(request: NextRequest) {
           action: "attendance_override",
           entity: "attendance",
           entityId: updated.id,
-          details: { targetUserId, date, inTime, outTime },
+          details: { targetUserId, date, inTime: cleanInTime, outTime: cleanOutTime },
         });
       }
 
@@ -158,8 +160,8 @@ export async function POST(request: NextRequest) {
     const [record] = await db.insert(attendance).values({
       userId: targetUserId,
       date,
-      inTime,
-      outTime,
+      inTime: cleanInTime,
+      outTime: cleanOutTime,
       workingHours: calculations.workingHours,
       lateMinutes: calculations.lateMinutes,
       overtimeMinutes: calculations.overtimeMinutes,

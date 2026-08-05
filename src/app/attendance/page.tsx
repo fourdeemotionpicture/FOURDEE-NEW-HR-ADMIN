@@ -54,10 +54,19 @@ export default function AttendancePage() {
     if (form.notes) body.notes = form.notes;
     if (userRole === "super_admin" && form.userId) body.userId = form.userId;
 
-    await fetch("/api/attendance", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    setShowModal(false);
-    setForm({ userId: "", date: "", inTime: "", outTime: "", notes: "" });
-    fetchData();
+    try {
+      const res = await fetch("/api/attendance", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "Failed to save attendance");
+        return;
+      }
+      setShowModal(false);
+      setForm({ userId: "", date: "", inTime: "", outTime: "", notes: "" });
+      fetchData();
+    } catch {
+      alert("Network error. Please try again.");
+    }
   };
 
   const monthStart = startOfMonth(currentMonth);
