@@ -14,6 +14,16 @@ import AppShell from "@/components/AppShell";
 import { format } from "date-fns";
 
 interface DashboardData {
+  userRole?: string;
+  employeeSalary?: {
+    monthlySalary: string;
+    estimatedPayable: string;
+  };
+  personalStats?: {
+    presentDays: number;
+    absentDays: number;
+    lateDays: number;
+  };
   totalEmployees: number;
   presentToday: number;
   lateToday: number;
@@ -79,10 +89,7 @@ export default function DashboardPage() {
     { name: "Absent", value: data.absentToday },
   ] : [];
 
-  const expensesPieData = data ? [
-    { name: "Today Expenses", value: parseFloat(data.todayExpenses || "0") },
-    { name: "Remaining Balance", value: Math.max(0, parseFloat(data.currentBalance || "0") - parseFloat(data.todayExpenses || "0")) },
-  ] : [];
+  const isEmployee = data?.userRole === "employee";
 
   if (loading) {
     return (
@@ -111,16 +118,30 @@ export default function DashboardPage() {
         </motion.div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
-          <KpiCard icon={Users} label="Total Employees" value={data?.totalEmployees ?? 0} color="bg-blue-50 text-blue-600" delay={0} />
-          <KpiCard icon={UserCheck} label="Present Today" value={data?.presentToday ?? 0} sub={`${data?.todayWorkingHours ?? 0} hrs worked`} color="bg-emerald-50 text-emerald-600" delay={0.05} />
-          <KpiCard icon={UserX} label="Absent Today" value={data?.absentToday ?? 0} color="bg-red-50 text-red-600" delay={0.1} />
-          <KpiCard icon={AlertCircle} label="Late Today" value={data?.lateToday ?? 0} color="bg-amber-50 text-amber-600" delay={0.15} />
-          <KpiCard icon={Wallet} label="Cash Balance" value={`₹${parseFloat(data?.currentBalance ?? "0").toLocaleString()}`} color="bg-indigo-50 text-indigo-600" delay={0.2} />
-          <KpiCard icon={IndianRupee} label="Today Expenses" value={`₹${parseFloat(data?.todayExpenses ?? "0").toLocaleString()}`} color="bg-orange-50 text-orange-600" delay={0.25} />
-          <KpiCard icon={FileText} label="Work Reports Today" value={data?.todayWorkReports ?? 0} sub={`${data?.monthlyWorkReports ?? 0} this month`} color="bg-cyan-50 text-cyan-600" delay={0.3} />
-          <KpiCard icon={Calendar} label="Monthly Attendance" value={data?.monthlyAttendance ?? 0} color="bg-violet-50 text-violet-600" delay={0.35} />
-        </div>
+        {isEmployee ? (
+          /* Employee Dashboard Views */
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+            <KpiCard icon={IndianRupee} label="Monthly Salary (Base)" value={`₹${parseFloat(data?.employeeSalary?.monthlySalary ?? "0").toLocaleString()}`} color="bg-emerald-50 text-emerald-600" delay={0} />
+            <KpiCard icon={Wallet} label="Estimated Payable Salary" value={`₹${parseFloat(data?.employeeSalary?.estimatedPayable ?? "0").toLocaleString()}`} sub="Based on attendance so far" color="bg-blue-50 text-blue-600" delay={0.05} />
+            <KpiCard icon={UserCheck} label="My Present Days" value={data?.personalStats?.presentDays ?? 0} color="bg-emerald-50 text-emerald-600" delay={0.1} />
+            <KpiCard icon={UserX} label="My Absent Days" value={data?.personalStats?.absentDays ?? 0} color="bg-red-50 text-red-600" delay={0.15} />
+            <KpiCard icon={AlertCircle} label="My Late Days" value={data?.personalStats?.lateDays ?? 0} color="bg-amber-50 text-amber-600" delay={0.2} />
+            <KpiCard icon={FileText} label="My Work Reports" value={data?.todayWorkReports ?? 0} sub={`${data?.monthlyWorkReports ?? 0} this month`} color="bg-cyan-50 text-cyan-600" delay={0.25} />
+            <KpiCard icon={Calendar} label="My Attendance Days" value={data?.monthlyAttendance ?? 0} color="bg-violet-50 text-violet-600" delay={0.3} />
+          </div>
+        ) : (
+          /* Admin / Super Admin / Office Admin Dashboard Views */
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+            <KpiCard icon={Users} label="Total Employees" value={data?.totalEmployees ?? 0} color="bg-blue-50 text-blue-600" delay={0} />
+            <KpiCard icon={UserCheck} label="Present Today" value={data?.presentToday ?? 0} sub={`${data?.todayWorkingHours ?? 0} hrs worked`} color="bg-emerald-50 text-emerald-600" delay={0.05} />
+            <KpiCard icon={UserX} label="Absent Today" value={data?.absentToday ?? 0} color="bg-red-50 text-red-600" delay={0.1} />
+            <KpiCard icon={AlertCircle} label="Late Today" value={data?.lateToday ?? 0} color="bg-amber-50 text-amber-600" delay={0.15} />
+            <KpiCard icon={Wallet} label="Cash Balance" value={`₹${parseFloat(data?.currentBalance ?? "0").toLocaleString()}`} color="bg-indigo-50 text-indigo-600" delay={0.2} />
+            <KpiCard icon={IndianRupee} label="Today Expenses" value={`₹${parseFloat(data?.todayExpenses ?? "0").toLocaleString()}`} color="bg-orange-50 text-orange-600" delay={0.25} />
+            <KpiCard icon={FileText} label="Work Reports Today" value={data?.todayWorkReports ?? 0} sub={`${data?.monthlyWorkReports ?? 0} this month`} color="bg-cyan-50 text-cyan-600" delay={0.3} />
+            <KpiCard icon={Calendar} label="Monthly Attendance" value={data?.monthlyAttendance ?? 0} color="bg-violet-50 text-violet-600" delay={0.35} />
+          </div>
+        )}
 
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -194,28 +215,30 @@ export default function DashboardPage() {
         </div>
 
         {/* Monthly Expenses Chart */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-          className="card p-5"
-        >
-          <h3 className="text-base font-semibold text-gray-900 mb-4">Cash Flow Overview</h3>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="text-center p-4 bg-blue-50/50 rounded-xl">
-              <p className="text-xs text-gray-500 mb-1">Monthly Expenses</p>
-              <p className="text-lg font-bold text-blue-600">₹{parseFloat(data?.monthlyExpenses ?? "0").toLocaleString()}</p>
+        {!isEmployee && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+            className="card p-5"
+          >
+            <h3 className="text-base font-semibold text-gray-900 mb-4">Cash Flow Overview</h3>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="text-center p-4 bg-blue-50/50 rounded-xl">
+                <p className="text-xs text-gray-500 mb-1">Monthly Expenses</p>
+                <p className="text-lg font-bold text-blue-600">₹{parseFloat(data?.monthlyExpenses ?? "0").toLocaleString()}</p>
+              </div>
+              <div className="text-center p-4 bg-emerald-50/50 rounded-xl">
+                <p className="text-xs text-gray-500 mb-1">Current Balance</p>
+                <p className="text-lg font-bold text-emerald-600">₹{parseFloat(data?.currentBalance ?? "0").toLocaleString()}</p>
+              </div>
+              <div className="text-center p-4 bg-amber-50/50 rounded-xl">
+                <p className="text-xs text-gray-500 mb-1">Today Expenses</p>
+                <p className="text-lg font-bold text-amber-600">₹{parseFloat(data?.todayExpenses ?? "0").toLocaleString()}</p>
+              </div>
             </div>
-            <div className="text-center p-4 bg-emerald-50/50 rounded-xl">
-              <p className="text-xs text-gray-500 mb-1">Current Balance</p>
-              <p className="text-lg font-bold text-emerald-600">₹{parseFloat(data?.currentBalance ?? "0").toLocaleString()}</p>
-            </div>
-            <div className="text-center p-4 bg-amber-50/50 rounded-xl">
-              <p className="text-xs text-gray-500 mb-1">Today Expenses</p>
-              <p className="text-lg font-bold text-amber-600">₹{parseFloat(data?.todayExpenses ?? "0").toLocaleString()}</p>
-            </div>
-          </div>
-        </motion.div>
+          </motion.div>
+        )}
       </div>
     </AppShell>
   );

@@ -3,7 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/db";
 import { users, attendance, workReports, expenses, pettyCash } from "@/db/schema";
 import { eq, and, gte, lte, sql, count, sum } from "drizzle-orm";
-import { format, startOfMonth, endOfMonth, startOfDay, endOfDay } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfDay, endOfDay, getDaysInMonth } from "date-fns";
 
 export async function GET() {
   try {
@@ -58,7 +58,11 @@ export async function GET() {
     // Working hours today
     const todayWorkingHours = todayAttendance.reduce((acc, a) => acc + parseFloat(a.workingHours ?? "0"), 0);
 
-    // For employees, filter by their own data
+    // Fetch current user database profile to get their salary
+    const dbUser = await db.query.users.findFirst({
+      where: eq(users.id, currentUser.userId),
+    });
+
     const isEmployee = currentUser.role === "employee";
     const employeeId = currentUser.userId;
 
@@ -68,6 +72,41 @@ export async function GET() {
     if (isEmployee) {
       filteredAttendance = monthlyAttendance.filter((a) => a.userId === employeeId);
       filteredWorkReports = monthlyWorkReports.filter((w) => w.userId === employeeId);
+    }
+
+    // Salary estimation for dashboard
+    let employeeSalary = {
+      monthlySalary: "0",
+      estimatedPayable: "0",
+    };
+
+    let personalStats = {
+      presentDays: 0,
+      absentDays: 0,
+      lateDays: 0,
+    };
+
+    if (dbUser) {
+      const monthlySalary = parseFloat(dbUser.monthlySalary ?? "0");
+      employeeSalary.monthlySalary = monthlySalary.toFixed(2);
+
+      const totalDaysInMonth = getDaysInMonth(new Date());
+      const dailySalary = monthlySalary / totalDaysInMonth;
+
+      const userAttendance = monthlyAttendance.filter((a) => a.userId === dbUser.id);
+      const presentDays = userAttendance.filter((a) => a.status === "present" || a.status === "half_day").length;
+      const lateDays = userAttendance.filter((a) => (a.lateMinutes ?? 0) > 0).length;
+      const absentDays = totalDaysInMonth - presentDays;
+      const deductions = absentDays * dailySalary;
+      const estimatedPayable = Math.max(0, monthlySalary - deductions);
+
+      employeeSalary.estimatedPayable = estimatedPayable.toFixed(2);
+      
+      personalStats = {
+        presentDays,
+        absentDays,
+        lateDays,
+      };
     }
 
     // Attendance trend for chart (last 7 days)
@@ -85,6 +124,9 @@ export async function GET() {
     }
 
     return NextResponse.json({
+      userRole: currentUser.role,
+      employeeSalary,
+      personalStats,
       totalEmployees,
       presentToday,
       lateToday,
