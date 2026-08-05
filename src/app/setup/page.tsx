@@ -18,12 +18,23 @@ export default function SetupPage() {
 
   useEffect(() => {
     fetch("/api/setup")
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) {
+          return r.json().then((d) => {
+            throw new Error(d.error || "Failed to check setup status");
+          });
+        }
+        return r.json();
+      })
       .then((d) => {
-        if (!d.setupRequired) {
+        if (d.setupRequired === false) {
           router.push("/login");
         }
         setNeedsSetup(d.setupRequired);
+      })
+      .catch((err) => {
+        setError(err.message || "Database connection error");
+        setNeedsSetup(true);
       });
   }, [router]);
 
