@@ -1,0 +1,105 @@
+import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth";
+import { db } from "@/db";
+import { users, attendance, workReports, expenses, pettyCash } from "@/db/schema";
+import { eq, and, gte, lte, sql, count, sum } from "drizzle-orm";
+import { format, startOfMonth, endOfMonth, startOfDay, endOfDay } from "date-fns";
+
+export async function GET() {
+  try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const today = format(new Date(), "yyyy-MM-dd");
+    const monthStart = format(startOfMonth(new Date()), "yyyy-MM-dd");
+    const monthEnd = format(endOfMonth(new Date()), "yyyy-MM-dd");
+
+    // Total employees
+    const allUsers = await db.select({ id: users.id, role: users.role }).from(users).where(eq(users.isActive, true));
+    const totalEmployees = allUsers.length;
+
+    // Today's attendance
+    const todayAttendance = await db.select().from(attendance).where(eq(attendance.date, today));
+    const presentToday = todayAttendance.filter((a) => a.status === "present" || a.status === "half_day").length;
+    const lateToday = todayAttendance.filter((a) => (a.lateMinutes ?? 0) > 0).length;
+    const absentToday = totalEmployees - presentToday;
+
+    // Monthly attendance stats
+    const monthlyAttendance = await db.select().from(attendance).where(
+      and(gte(attendance.date, monthStart), lte(attendance.date, monthEnd))
+    );
+
+    // Today's expenses
+    const todayExpenses = await db.select({
+      total: sum(expenses.amount),
+    }).from(expenses).where(eq(expenses.date, today));
+
+    // Monthly expenses
+    const monthlyExpenses = await db.select({
+      total: sum(expenses.amount),
+    }).from(expenses).where(
+      and(gte(expenses.date, monthStart), lte(expenses.date, monthEnd))
+    );
+
+    // Current cash balance
+    const lastPettyCash = await db.select().from(pettyCash).orderBy(sql`${pettyCash.createdAt} DESC`).limit(1);
+    const currentBalance = lastPettyCash.length > 0 ? (lastPettyCash[0].balanceAfter ?? "0") : "0";
+
+    // Work reports today
+    const todayWorkReports = await db.select().from(workReports).where(eq(workReports.date, today));
+
+    // Monthly work reports
+    const monthlyWorkReports = await db.select().from(workReports).where(
+      and(gte(workReports.date, monthStart), lte(workReports.date, monthEnd))
+    );
+
+    // Working hours today
+    const todayWorkingHours = todayAttendance.reduce((acc, a) => acc + parseFloat(a.workingHours ?? "0"), 0);
+
+    // For employees, filter by their own data
+    const isEmployee = currentUser.role === "employee";
+    const employeeId = currentUser.userId;
+
+    let filteredAttendance = monthlyAttendance;
+    let filteredWorkReports = monthlyWorkReports;
+
+    if (isEmployee) {
+      filteredAttendance = monthlyAttendance.filter((a) => a.userId === employeeId);
+      filteredWorkReports = monthlyWorkReports.filter((w) => w.userId === employeeId);
+    }
+
+    // Attendance trend for chart (last 7 days)
+    const attendanceTrend = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = format(d, "yyyy-MM-dd");
+      const dayAttendance = monthlyAttendance.filter((a) => a.date === dateStr);
+      attendanceTrend.push({
+        date: format(d, "MMM dd"),
+        present: dayAttendance.filter((a) => a.status === "present" || a.status === "half_day").length,
+        late: dayAttendance.filter((a) => (a.lateMinutes ?? 0) > 0).length,
+      });
+    }
+
+    return NextResponse.json({
+      totalEmployees,
+      presentToday,
+      lateToday,
+      absentToday,
+      todayWorkingHours: todayWorkingHours.toFixed(1),
+      monthlyAttendance: filteredAttendance.length,
+      todayExpenses: todayExpenses[0]?.total ?? "0",
+      monthlyExpenses: monthlyExpenses[0]?.total ?? "0",
+      currentBalance,
+      todayWorkReports: isEmployee ? todayWorkReports.filter((w) => w.userId === employeeId).length : todayWorkReports.length,
+      monthlyWorkReports: filteredWorkReports.length,
+      attendanceTrend,
+    });
+  } catch (error) {
+    console.error("Dashboard error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
