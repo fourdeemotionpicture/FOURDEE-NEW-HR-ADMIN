@@ -4,9 +4,20 @@ import * as schema from "./schema";
 
 const databaseUrl = process.env.DATABASE_URL;
 
+const isBuildTime =
+  process.env.NEXT_PHASE === "phase-production-build" ||
+  process.env.CI === "true" ||
+  process.env.VERCEL === "1";
+
 if (!databaseUrl) {
-  throw new Error("DATABASE_URL is required");
+  if (isBuildTime) {
+    console.warn("⚠️ DATABASE_URL is not set at build time. Using placeholder connection string.");
+  } else {
+    throw new Error("DATABASE_URL is required at runtime.");
+  }
 }
+
+const connectionString = databaseUrl || "postgresql://postgres:postgres@127.0.0.1:5432/placeholder_db";
 
 const globalForDb = globalThis as typeof globalThis & {
   __arenaNextJsPostgresqlPool?: Pool;
@@ -15,7 +26,7 @@ const globalForDb = globalThis as typeof globalThis & {
 export const pool =
   globalForDb.__arenaNextJsPostgresqlPool ??
   new Pool({
-    connectionString: databaseUrl,
+    connectionString,
   });
 
 if (process.env.NODE_ENV !== "production") {
