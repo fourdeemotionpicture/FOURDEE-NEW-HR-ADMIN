@@ -89,7 +89,7 @@ export default function DashboardPage() {
     { name: "Absent", value: data.absentToday },
   ] : [];
 
-  const isEmployee = data?.userRole === "employee";
+  const isEmployee = data?.userRole === "employee" || data?.userRole === "office_admin";
 
   if (loading) {
     return (
@@ -115,9 +115,11 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2">
             <span className="badge badge-success">System Online</span>
           </div>
-        </motion.div>        {/* KPI Cards */}
+        </motion.div>
+
+        {/* KPI Cards */}
         {isEmployee ? (
-          /* Employee Dashboard Views */
+          /* Employee / Office Admin Dashboard Views (Personal Stats + Salary details) */
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
             <KpiCard icon={IndianRupee} label="Monthly Salary (Base)" value={`₹${parseFloat(data?.employeeSalary?.monthlySalary ?? "0").toLocaleString()}`} color="bg-emerald-50 text-emerald-600" delay={0} />
             <KpiCard icon={Wallet} label="Estimated Payable Salary" value={`₹${parseFloat(data?.employeeSalary?.estimatedPayable ?? "0").toLocaleString()}`} sub="Based on attendance so far" color="bg-blue-50 text-blue-600" delay={0.05} />
@@ -127,8 +129,8 @@ export default function DashboardPage() {
             <KpiCard icon={FileText} label="My Work Reports" value={data?.todayWorkReports ?? 0} sub={`${data?.monthlyWorkReports ?? 0} this month`} color="bg-cyan-50 text-cyan-600" delay={0.25} />
             <KpiCard icon={Calendar} label="My Attendance Days" value={data?.monthlyAttendance ?? 0} color="bg-violet-50 text-violet-600" delay={0.3} />
           </div>
-        ) : data?.userRole === "office_admin" ? (
-          /* Office Admin Dashboard Views (Admin stats + Salary, no petty cash/expenses) */
+        ) : (
+          /* Admin / Super Admin / Owner Admin Dashboard Views (Admin stats + Salary, no petty cash) */
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
             <KpiCard icon={Users} label="Total Employees" value={data?.totalEmployees ?? 0} color="bg-blue-50 text-blue-600" delay={0} />
             <KpiCard icon={UserCheck} label="Present Today" value={data?.presentToday ?? 0} sub={`${data?.todayWorkingHours ?? 0} hrs worked`} color="bg-emerald-50 text-emerald-600" delay={0.05} />
@@ -136,18 +138,6 @@ export default function DashboardPage() {
             <KpiCard icon={AlertCircle} label="Late Today" value={data?.lateToday ?? 0} color="bg-amber-50 text-amber-600" delay={0.15} />
             <KpiCard icon={IndianRupee} label="Monthly Salary (Base)" value={`₹${parseFloat(data?.employeeSalary?.monthlySalary ?? "0").toLocaleString()}`} color="bg-emerald-50 text-emerald-600" delay={0.2} />
             <KpiCard icon={Wallet} label="Estimated Payable Salary" value={`₹${parseFloat(data?.employeeSalary?.estimatedPayable ?? "0").toLocaleString()}`} sub="Full salary (no attendance tracking)" color="bg-blue-50 text-blue-600" delay={0.25} />
-            <KpiCard icon={FileText} label="Work Reports Today" value={data?.todayWorkReports ?? 0} sub={`${data?.monthlyWorkReports ?? 0} this month`} color="bg-cyan-50 text-cyan-600" delay={0.3} />
-            <KpiCard icon={Calendar} label="Monthly Attendance" value={data?.monthlyAttendance ?? 0} color="bg-violet-50 text-violet-600" delay={0.35} />
-          </div>
-        ) : (
-          /* Super Admin Dashboard Views (Admin stats + Petty Cash/Expenses) */
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
-            <KpiCard icon={Users} label="Total Employees" value={data?.totalEmployees ?? 0} color="bg-blue-50 text-blue-600" delay={0} />
-            <KpiCard icon={UserCheck} label="Present Today" value={data?.presentToday ?? 0} sub={`${data?.todayWorkingHours ?? 0} hrs worked`} color="bg-emerald-50 text-emerald-600" delay={0.05} />
-            <KpiCard icon={UserX} label="Absent Today" value={data?.absentToday ?? 0} color="bg-red-50 text-red-600" delay={0.1} />
-            <KpiCard icon={AlertCircle} label="Late Today" value={data?.lateToday ?? 0} color="bg-amber-50 text-amber-600" delay={0.15} />
-            <KpiCard icon={Wallet} label="Cash Balance" value={`₹${parseFloat(data?.currentBalance ?? "0").toLocaleString()}`} color="bg-indigo-50 text-indigo-600" delay={0.2} />
-            <KpiCard icon={IndianRupee} label="Today Expenses" value={`₹${parseFloat(data?.todayExpenses ?? "0").toLocaleString()}`} color="bg-orange-50 text-orange-600" delay={0.25} />
             <KpiCard icon={FileText} label="Work Reports Today" value={data?.todayWorkReports ?? 0} sub={`${data?.monthlyWorkReports ?? 0} this month`} color="bg-cyan-50 text-cyan-600" delay={0.3} />
             <KpiCard icon={Calendar} label="Monthly Attendance" value={data?.monthlyAttendance ?? 0} color="bg-violet-50 text-violet-600" delay={0.35} />
           </div>
@@ -223,32 +213,6 @@ export default function DashboardPage() {
             </div>
           </motion.div>
         </div>
-
-        {/* Monthly Expenses Chart */}
-        {data?.userRole === "super_admin" && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
-            className="card p-5"
-          >
-            <h3 className="text-base font-semibold text-gray-900 mb-4">Cash Flow Overview</h3>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="text-center p-4 bg-blue-50/50 rounded-xl">
-                <p className="text-xs text-gray-500 mb-1">Monthly Expenses</p>
-                <p className="text-lg font-bold text-blue-600">₹{parseFloat(data?.monthlyExpenses ?? "0").toLocaleString()}</p>
-              </div>
-              <div className="text-center p-4 bg-emerald-50/50 rounded-xl">
-                <p className="text-xs text-gray-500 mb-1">Current Balance</p>
-                <p className="text-lg font-bold text-emerald-600">₹{parseFloat(data?.currentBalance ?? "0").toLocaleString()}</p>
-              </div>
-              <div className="text-center p-4 bg-amber-50/50 rounded-xl">
-                <p className="text-xs text-gray-500 mb-1">Today Expenses</p>
-                <p className="text-lg font-bold text-amber-600">₹{parseFloat(data?.todayExpenses ?? "0").toLocaleString()}</p>
-              </div>
-            </div>
-          </motion.div>
-        )}
       </div>
     </AppShell>
   );

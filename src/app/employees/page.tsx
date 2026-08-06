@@ -4,9 +4,10 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { UserPlus, Search, Edit2, Trash2, X, Shield, User, Briefcase } from "lucide-react";
 import AppShell from "@/components/AppShell";
+import { format } from "date-fns";
 
 interface Employee {
-  id: string; name: string; email: string; role: string; designation: string; monthlySalary: string; isActive: boolean;
+  id: string; name: string; email: string; role: string; designation: string; monthlySalary: string; dob?: string; isActive: boolean;
 }
 
 export default function EmployeesPage() {
@@ -15,7 +16,7 @@ export default function EmployeesPage() {
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", email: "", password: "", role: "employee", designation: "", monthlySalary: "" });
+  const [form, setForm] = useState({ name: "", email: "", password: "", role: "employee", designation: "", monthlySalary: "", dob: "" });
 
   const fetchEmployees = async () => {
     const res = await fetch(`/api/employees?search=${search}`);
@@ -24,7 +25,16 @@ export default function EmployeesPage() {
     setLoading(false);
   };
 
+  const [userRole, setUserRole] = useState("");
+
   useEffect(() => { fetchEmployees(); }, [search]);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((d) => setUserRole(d.role))
+      .catch(console.error);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,13 +53,13 @@ export default function EmployeesPage() {
     }
     setShowModal(false);
     setEditId(null);
-    setForm({ name: "", email: "", password: "", role: "employee", designation: "", monthlySalary: "" });
+    setForm({ name: "", email: "", password: "", role: "employee", designation: "", monthlySalary: "", dob: "" });
     fetchEmployees();
   };
 
   const handleEdit = (emp: Employee) => {
     setEditId(emp.id);
-    setForm({ name: emp.name, email: emp.email, password: "", role: emp.role, designation: emp.designation || "", monthlySalary: emp.monthlySalary || "" });
+    setForm({ name: emp.name, email: emp.email, password: "", role: emp.role, designation: emp.designation || "", monthlySalary: emp.monthlySalary || "", dob: emp.dob || "" });
     setShowModal(true);
   };
 
@@ -60,7 +70,7 @@ export default function EmployeesPage() {
   };
 
   const roleBadge = (role: string) => {
-    const map: Record<string, string> = { super_admin: "badge-danger", office_admin: "badge-warning", employee: "badge-info" };
+    const map: Record<string, string> = { super_admin: "badge-danger", owner_admin: "badge-success", office_admin: "badge-warning", employee: "badge-info" };
     return map[role] || "badge-neutral";
   };
 
@@ -72,9 +82,11 @@ export default function EmployeesPage() {
             <h1 className="text-2xl font-bold text-gray-900">Employees</h1>
             <p className="text-sm text-gray-500 mt-0.5">Manage team members and access</p>
           </div>
-          <button onClick={() => { setShowModal(true); setEditId(null); setForm({ name: "", email: "", password: "", role: "employee", designation: "", monthlySalary: "" }); }} className="btn-primary">
-            <UserPlus className="w-4.5 h-4.5" /> Add Employee
-          </button>
+          {userRole !== "owner_admin" && (
+            <button onClick={() => { setShowModal(true); setEditId(null); setForm({ name: "", email: "", password: "", role: "employee", designation: "", monthlySalary: "", dob: "" }); }} className="btn-primary">
+              <UserPlus className="w-4.5 h-4.5" /> Add Employee
+            </button>
+          )}
         </motion.div>
 
         <div className="card p-4">
@@ -85,48 +97,54 @@ export default function EmployeesPage() {
         </div>
 
         <div className="card overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-100">
-                <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Name</th>
-                <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Email</th>
-                <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Role</th>
-                <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Designation</th>
-                <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Salary</th>
-                <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Status</th>
-                <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={7} className="text-center py-12 text-gray-400">Loading...</td></tr>
-              ) : employees.length === 0 ? (
-                <tr><td colSpan={7} className="text-center py-12 text-gray-400">No employees found</td></tr>
-              ) : employees.map((emp) => (
-                <motion.tr key={emp.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center">
-                        <span className="text-sm font-semibold text-blue-600">{emp.name.charAt(0)}</span>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Name</th>
+                  <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Email</th>
+                  <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Role</th>
+                  <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Designation</th>
+                  <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Salary</th>
+                  <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Date of Birth</th>
+                  <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Status</th>
+                  {userRole !== "owner_admin" && <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Actions</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr><td colSpan={userRole === "owner_admin" ? 7 : 8} className="text-center py-12 text-gray-400">Loading...</td></tr>
+                ) : employees.length === 0 ? (
+                  <tr><td colSpan={userRole === "owner_admin" ? 7 : 8} className="text-center py-12 text-gray-400">No employees found</td></tr>
+                ) : employees.map((emp) => (
+                  <motion.tr key={emp.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center">
+                          <span className="text-sm font-semibold text-blue-600">{emp.name.charAt(0)}</span>
+                        </div>
+                        <span className="text-sm font-medium text-gray-900">{emp.name}</span>
                       </div>
-                      <span className="text-sm font-medium text-gray-900">{emp.name}</span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3.5 text-sm text-gray-600">{emp.email}</td>
-                  <td className="px-5 py-3.5"><span className={`badge ${roleBadge(emp.role)}`}>{emp.role.replace("_", " ")}</span></td>
-                  <td className="px-5 py-3.5 text-sm text-gray-600">{emp.designation || "-"}</td>
-                  <td className="px-5 py-3.5 text-sm text-gray-600">₹{parseFloat(emp.monthlySalary || "0").toLocaleString()}</td>
-                  <td className="px-5 py-3.5"><span className={`badge ${emp.isActive ? "badge-success" : "badge-danger"}`}>{emp.isActive ? "Active" : "Inactive"}</span></td>
-                  <td className="px-5 py-3.5 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <button onClick={() => handleEdit(emp)} className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-blue-600 transition-colors"><Edit2 className="w-4 h-4" /></button>
-                      <button onClick={() => handleDelete(emp.id)} className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-red-600 transition-colors"><Trash2 className="w-4 h-4" /></button>
-                    </div>
-                  </td>
-                </motion.tr>
-              ))}
-            </tbody>
-          </table>
+                    </td>
+                    <td className="px-5 py-3.5 text-sm text-gray-600">{emp.email}</td>
+                    <td className="px-5 py-3.5"><span className={`badge ${roleBadge(emp.role)}`}>{emp.role.replace("_", " ")}</span></td>
+                    <td className="px-5 py-3.5 text-sm text-gray-600">{emp.designation || "-"}</td>
+                    <td className="px-5 py-3.5 text-sm text-gray-600">₹{parseFloat(emp.monthlySalary || "0").toLocaleString()}</td>
+                    <td className="px-5 py-3.5 text-sm text-gray-600">{emp.dob ? format(new Date(emp.dob), "MMM dd, yyyy") : "-"}</td>
+                    <td className="px-5 py-3.5"><span className={`badge ${emp.isActive ? "badge-success" : "badge-danger"}`}>{emp.isActive ? "Active" : "Inactive"}</span></td>
+                    {userRole !== "owner_admin" && (
+                      <td className="px-5 py-3.5 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button onClick={() => handleEdit(emp)} className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-blue-600 transition-colors"><Edit2 className="w-4 h-4" /></button>
+                          <button onClick={() => handleDelete(emp.id)} className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-red-600 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                        </div>
+                      </td>
+                    )}
+                  </motion.tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -157,6 +175,7 @@ export default function EmployeesPage() {
                   <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="input-field">
                     <option value="employee">Employee</option>
                     <option value="office_admin">Office Admin</option>
+                    <option value="owner_admin">Owner Admin</option>
                     <option value="super_admin">Super Admin</option>
                   </select>
                 </div>
@@ -167,6 +186,10 @@ export default function EmployeesPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Monthly Salary (₹)</label>
                   <input type="number" value={form.monthlySalary} onChange={(e) => setForm({ ...form, monthlySalary: e.target.value })} className="input-field" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
+                  <input type="date" value={form.dob} onChange={(e) => setForm({ ...form, dob: e.target.value })} className="input-field" />
                 </div>
                 <button type="submit" className="btn-primary w-full justify-center">{editId ? "Update Employee" : "Add Employee"}</button>
               </form>

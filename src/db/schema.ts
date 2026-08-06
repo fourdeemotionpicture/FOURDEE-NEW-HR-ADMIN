@@ -6,9 +6,10 @@ export const users = pgTable("users", {
   name: varchar("name", { length: 255 }).notNull(),
   email: varchar("email", { length: 255 }).notNull().unique(),
   passwordHash: text("password_hash").notNull(),
-  role: varchar("role", { length: 50 }).notNull().default("employee"), // super_admin, office_admin, employee
+  role: varchar("role", { length: 50 }).notNull().default("employee"), // super_admin, owner_admin, office_admin, employee
   designation: varchar("designation", { length: 255 }),
   monthlySalary: numeric("monthly_salary", { precision: 12, scale: 2 }).default("0"),
+  dob: date("dob"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

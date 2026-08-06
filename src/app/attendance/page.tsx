@@ -43,7 +43,7 @@ export default function AttendancePage() {
   }, [fetchData]);
 
   useEffect(() => {
-    if (userRole === "super_admin") {
+    if (userRole === "super_admin" || userRole === "owner_admin") {
       fetch("/api/employees").then((r) => r.json()).then((d) => setEmployees(d.employees || []));
     }
   }, [userRole]);
@@ -90,9 +90,11 @@ export default function AttendancePage() {
             <h1 className="text-2xl font-bold text-gray-900">Attendance</h1>
             <p className="text-sm text-gray-500 mt-0.5">Track and manage attendance records</p>
           </div>
-          <button onClick={() => { setShowModal(true); setForm({ userId: "", date: today, inTime: "10:00", outTime: "18:00", notes: "" }); }} className="btn-primary">
-            <Plus className="w-4.5 h-4.5" /> Mark Attendance
-          </button>
+          {userRole !== "owner_admin" && (
+            <button onClick={() => { setShowModal(true); setForm({ userId: "", date: today, inTime: "10:00", outTime: "18:00", notes: "" }); }} className="btn-primary">
+              <Plus className="w-4.5 h-4.5" /> Mark Attendance
+            </button>
+          )}
         </motion.div>
 
         {/* Stats */}
@@ -162,7 +164,7 @@ export default function AttendancePage() {
             <thead>
               <tr className="border-b border-gray-100">
                 <th className="text-left text-xs font-semibold text-gray-500 uppercase px-5 py-2.5">Date</th>
-                {userRole === "super_admin" && <th className="text-left text-xs font-semibold text-gray-500 uppercase px-5 py-2.5">Employee</th>}
+                {(userRole === "super_admin" || userRole === "owner_admin") && <th className="text-left text-xs font-semibold text-gray-500 uppercase px-5 py-2.5">Employee</th>}
                 <th className="text-left text-xs font-semibold text-gray-500 uppercase px-5 py-2.5">In Time</th>
                 <th className="text-left text-xs font-semibold text-gray-500 uppercase px-5 py-2.5">Out Time</th>
                 <th className="text-left text-xs font-semibold text-gray-500 uppercase px-5 py-2.5">Hours</th>
@@ -180,7 +182,7 @@ export default function AttendancePage() {
               ) : records.sort((a, b) => b.date.localeCompare(a.date)).map((r) => (
                 <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50/50">
                   <td className="px-5 py-2.5 text-sm text-gray-900">{r.date}</td>
-                  {userRole === "super_admin" && <td className="px-5 py-2.5 text-sm text-gray-600">{r.userName || "-"}</td>}
+                  {(userRole === "super_admin" || userRole === "owner_admin") && <td className="px-5 py-2.5 text-sm text-gray-600">{r.userName || "-"}</td>}
                   <td className="px-5 py-2.5 text-sm text-gray-600">{r.inTime || "-"}</td>
                   <td className="px-5 py-2.5 text-sm text-gray-600">{r.outTime || "-"}</td>
                   <td className="px-5 py-2.5 text-sm text-gray-600">{r.workingHours || "-"}</td>

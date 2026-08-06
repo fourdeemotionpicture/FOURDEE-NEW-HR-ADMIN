@@ -64,8 +64,12 @@ export function hasPermission(role: string, permission: string): boolean {
       "announcements", "expenses", "reports", "settings", "manual_attendance_override",
       "role_management", "export", "audit_logs"
     ],
+    owner_admin: [
+      "dashboard", "employees", "attendance", "salary", "work_reports",
+      "announcements", "expenses", "reports", "export"
+    ],
     office_admin: [
-      "dashboard", "expenses", "reports"
+      "dashboard", "attendance_own", "work_reports_own", "announcements_view", "expenses"
     ],
     employee: [
       "dashboard", "attendance_own", "work_reports_own", "announcements_view"

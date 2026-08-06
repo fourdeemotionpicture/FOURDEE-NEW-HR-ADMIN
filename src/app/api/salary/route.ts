@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
       monthlySalary: users.monthlySalary,
     }).from(users).where(eq(users.isActive, true));
 
-    if (currentUser.role === "employee") {
+    if (currentUser.role === "employee" || currentUser.role === "office_admin") {
       allUsers = allUsers.filter((u) => u.id === currentUser.userId);
     } else if (userId) {
       allUsers = allUsers.filter((u) => u.id === userId);
@@ -49,16 +49,25 @@ export async function GET(request: NextRequest) {
       const hourlySalary = dailySalary / 8;
       const perMinuteSalary = hourlySalary / 60;
 
-      const presentDays = userAttendance.filter((a) => a.status === "present" || a.status === "half_day").length;
-      const lateDays = userAttendance.filter((a) => (a.lateMinutes ?? 0) > 0).length;
+      let presentDays = userAttendance.filter((a) => a.status === "present" || a.status === "half_day").length;
+      let lateDays = userAttendance.filter((a) => (a.lateMinutes ?? 0) > 0).length;
       const totalWorkingHours = userAttendance.reduce((acc, a) => acc + parseFloat(a.workingHours ?? "0"), 0);
       const totalOvertime = userAttendance.reduce((acc, a) => acc + (a.overtimeMinutes ?? 0), 0);
-      const absentDays = totalDaysInMonth - presentDays;
+      let absentDays = totalDaysInMonth - presentDays;
 
-      // Calculate earned salary based on working hours
-      const earnedSalary = presentDays * dailySalary;
-      const deductions = absentDays * dailySalary;
-      const finalPayable = Math.max(0, monthlySalary - deductions);
+      // Calculate earned salary and deductions
+      let earnedSalary = presentDays * dailySalary;
+      let deductions = absentDays * dailySalary;
+      let finalPayable = Math.max(0, monthlySalary - deductions);
+
+      // If user does not track attendance (super_admin, owner_admin)
+      if (user.role !== "employee" && user.role !== "office_admin") {
+        presentDays = totalDaysInMonth;
+        absentDays = 0;
+        deductions = 0;
+        earnedSalary = monthlySalary;
+        finalPayable = monthlySalary;
+      }
 
       return {
         userId: user.id,

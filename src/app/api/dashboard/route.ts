@@ -64,12 +64,13 @@ export async function GET() {
     });
 
     const isEmployee = currentUser.role === "employee";
+    const isOfficeAdmin = currentUser.role === "office_admin";
     const employeeId = currentUser.userId;
 
     let filteredAttendance = monthlyAttendance;
     let filteredWorkReports = monthlyWorkReports;
 
-    if (isEmployee) {
+    if (isEmployee || isOfficeAdmin) {
       filteredAttendance = monthlyAttendance.filter((a) => a.userId === employeeId);
       filteredWorkReports = monthlyWorkReports.filter((w) => w.userId === employeeId);
     }
@@ -95,7 +96,7 @@ export async function GET() {
       let absentDays = 0;
       let lateDays = 0;
 
-      if (dbUser.role === "employee") {
+      if (dbUser.role === "employee" || dbUser.role === "office_admin") {
         const totalDaysInMonth = getDaysInMonth(new Date());
         const dailySalary = monthlySalary / totalDaysInMonth;
 

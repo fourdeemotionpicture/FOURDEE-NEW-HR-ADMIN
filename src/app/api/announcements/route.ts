@@ -13,11 +13,37 @@ export async function GET() {
     }
 
     const records = await db.select().from(announcements).orderBy(desc(announcements.createdAt));
-    const allUsers = await db.select({ id: users.id, name: users.name }).from(users);
+    const allUsers = await db.select({ id: users.id, name: users.name, dob: users.dob }).from(users);
     const userMap = Object.fromEntries(allUsers.map((u) => [u.id, u.name]));
     const enriched = records.map((r) => ({ ...r, createdByName: userMap[r.createdBy] || "Unknown" }));
 
-    return NextResponse.json({ announcements: enriched });
+    // Dynamically inject birthday announcements
+    const todayStr = format(new Date(), "MM-dd");
+    const birthdayAnnouncements: any[] = [];
+    
+    allUsers.forEach((u) => {
+      if (u.dob) {
+        // u.dob is string in format YYYY-MM-DD
+        const dobMonthDay = u.dob.substring(5);
+        if (dobMonthDay === todayStr) {
+          birthdayAnnouncements.push({
+            id: `bday-${u.id}`,
+            title: `🎂 Happy Birthday, ${u.name}! 🎉`,
+            description: `Four Dee ERP wishes ${u.name} a very Happy Birthday! Have a wonderful year ahead filled with happiness and success! 🥳🎈`,
+            date: format(new Date(), "yyyy-MM-dd"),
+            time: "09:00",
+            attachmentUrl: null,
+            createdBy: u.id,
+            createdByName: "System Admin",
+            createdAt: new Date().toISOString(),
+          });
+        }
+      }
+    });
+
+    const combined = [...birthdayAnnouncements, ...enriched];
+
+    return NextResponse.json({ announcements: combined });
   } catch (error) {
     console.error("Announcements GET error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

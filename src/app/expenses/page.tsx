@@ -26,6 +26,7 @@ export default function ExpensesPage() {
   const [currentBalance, setCurrentBalance] = useState("0");
   const [monthlySummary, setMonthlySummary] = useState({ totalExpenses: "0", totalCashReceived: "0", openingBalance: "0", closingBalance: "0" });
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState("");
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -38,7 +39,13 @@ export default function ExpensesPage() {
     setLoading(false);
   }, [currentMonth]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    fetchData();
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((d) => setUserRole(d.role))
+      .catch(console.error);
+  }, [fetchData]);
 
   const handleExpenseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,8 +102,12 @@ export default function ExpensesPage() {
           </div>
           <div className="flex gap-2">
             <button onClick={handleExport} className="btn-secondary"><Receipt className="w-4.5 h-4.5" /> Export</button>
-            <button onClick={() => { setModalType("petty_cash"); setShowModal(true); }} className="btn-secondary"><Wallet className="w-4.5 h-4.5" /> Add Cash</button>
-            <button onClick={() => { setModalType("expense"); setShowModal(true); }} className="btn-primary"><Plus className="w-4.5 h-4.5" /> Add Expense</button>
+            {userRole !== "owner_admin" && (
+              <>
+                <button onClick={() => { setModalType("petty_cash"); setShowModal(true); }} className="btn-secondary"><Wallet className="w-4.5 h-4.5" /> Add Cash</button>
+                <button onClick={() => { setModalType("expense"); setShowModal(true); }} className="btn-primary"><Plus className="w-4.5 h-4.5" /> Add Expense</button>
+              </>
+            )}
           </div>
         </motion.div>
 

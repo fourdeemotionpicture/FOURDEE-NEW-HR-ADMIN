@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
       role: users.role,
       designation: users.designation,
       monthlySalary: users.monthlySalary,
+      dob: users.dob,
       isActive: users.isActive,
       createdAt: users.createdAt,
     }).from(users);
@@ -41,6 +42,7 @@ export async function GET(request: NextRequest) {
       role: users.role,
       designation: users.designation,
       monthlySalary: users.monthlySalary,
+      dob: users.dob,
       isActive: users.isActive,
       createdAt: users.createdAt,
     }).from(users);
@@ -57,8 +59,8 @@ export async function GET(request: NextRequest) {
       filtered = filtered.filter((u) => u.role === role);
     }
 
-    // Employees can only see themselves
-    if (currentUser.role === "employee") {
+    // Employees and Office Admins can only see themselves
+    if (currentUser.role === "employee" || currentUser.role === "office_admin") {
       filtered = filtered.filter((u) => u.id === currentUser.userId);
     }
 
@@ -77,7 +79,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, email, password, role, designation, monthlySalary } = body;
+    const { name, email, password, role, designation, monthlySalary, dob } = body;
 
     if (!name || !email || !password) {
       return NextResponse.json({ error: "Name, email, and password are required" }, { status: 400 });
@@ -92,6 +94,7 @@ export async function POST(request: NextRequest) {
       role: role || "employee",
       designation: designation || "",
       monthlySalary: monthlySalary || "0",
+      dob: dob || null,
     }).returning();
 
     // Audit log
@@ -100,7 +103,7 @@ export async function POST(request: NextRequest) {
       action: "create",
       entity: "user",
       entityId: user.id,
-      details: { name, email, role },
+      details: { name, email, role, dob },
     });
 
     return NextResponse.json({
@@ -123,7 +126,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { id, name, role, designation, monthlySalary, isActive, password } = body;
+    const { id, name, role, designation, monthlySalary, isActive, password, dob } = body;
 
     if (!id) {
       return NextResponse.json({ error: "User ID is required" }, { status: 400 });
@@ -135,6 +138,7 @@ export async function PUT(request: NextRequest) {
     if (designation !== undefined) updateData.designation = designation;
     if (monthlySalary !== undefined) updateData.monthlySalary = monthlySalary;
     if (isActive !== undefined) updateData.isActive = isActive;
+    if (dob !== undefined) updateData.dob = dob || null;
     if (password) updateData.passwordHash = await hashPassword(password);
 
     const [updated] = await db.update(users).set(updateData).where(eq(users.id, id)).returning();

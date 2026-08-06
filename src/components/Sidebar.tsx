@@ -25,14 +25,14 @@ interface SidebarProps {
 }
 
 const menuItems = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["super_admin", "office_admin", "employee"] },
-  { label: "Employees", href: "/employees", icon: Users, roles: ["super_admin"] },
-  { label: "Attendance", href: "/attendance", icon: Clock, roles: ["super_admin", "employee"] },
-  { label: "Salary", href: "/salary", icon: IndianRupee, roles: ["super_admin"] },
-  { label: "Work Reports", href: "/work-reports", icon: FileText, roles: ["super_admin", "employee"] },
-  { label: "Announcements", href: "/announcements", icon: Megaphone, roles: ["super_admin", "employee"] },
-  { label: "Expenses", href: "/expenses", icon: Receipt, roles: ["super_admin", "office_admin"] },
-  { label: "Reports", href: "/reports", icon: BarChart3, roles: ["super_admin", "office_admin"] },
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["super_admin", "owner_admin", "office_admin", "employee"] },
+  { label: "Employees", href: "/employees", icon: Users, roles: ["super_admin", "owner_admin"] },
+  { label: "Attendance", href: "/attendance", icon: Clock, roles: ["super_admin", "owner_admin", "office_admin", "employee"] },
+  { label: "Salary", href: "/salary", icon: IndianRupee, roles: ["super_admin", "owner_admin"] },
+  { label: "Work Reports", href: "/work-reports", icon: FileText, roles: ["super_admin", "owner_admin", "office_admin", "employee"] },
+  { label: "Announcements", href: "/announcements", icon: Megaphone, roles: ["super_admin", "owner_admin", "office_admin", "employee"] },
+  { label: "Expenses", href: "/expenses", icon: Receipt, roles: ["super_admin", "owner_admin", "office_admin"] },
+  { label: "Reports", href: "/reports", icon: BarChart3, roles: ["super_admin", "owner_admin"] },
 ];
 
 export default function Sidebar({ userRole, userName }: SidebarProps) {
