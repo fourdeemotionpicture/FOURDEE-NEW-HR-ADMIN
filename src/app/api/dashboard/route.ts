@@ -90,15 +90,22 @@ export async function GET() {
       const monthlySalary = parseFloat(dbUser.monthlySalary ?? "0");
       employeeSalary.monthlySalary = monthlySalary.toFixed(2);
 
-      const totalDaysInMonth = getDaysInMonth(new Date());
-      const dailySalary = monthlySalary / totalDaysInMonth;
+      let estimatedPayable = monthlySalary;
+      let presentDays = 0;
+      let absentDays = 0;
+      let lateDays = 0;
 
-      const userAttendance = monthlyAttendance.filter((a) => a.userId === dbUser.id);
-      const presentDays = userAttendance.filter((a) => a.status === "present" || a.status === "half_day").length;
-      const lateDays = userAttendance.filter((a) => (a.lateMinutes ?? 0) > 0).length;
-      const absentDays = totalDaysInMonth - presentDays;
-      const deductions = absentDays * dailySalary;
-      const estimatedPayable = Math.max(0, monthlySalary - deductions);
+      if (dbUser.role === "employee") {
+        const totalDaysInMonth = getDaysInMonth(new Date());
+        const dailySalary = monthlySalary / totalDaysInMonth;
+
+        const userAttendance = monthlyAttendance.filter((a) => a.userId === dbUser.id);
+        presentDays = userAttendance.filter((a) => a.status === "present" || a.status === "half_day").length;
+        lateDays = userAttendance.filter((a) => (a.lateMinutes ?? 0) > 0).length;
+        absentDays = totalDaysInMonth - presentDays;
+        const deductions = absentDays * dailySalary;
+        estimatedPayable = Math.max(0, monthlySalary - deductions);
+      }
 
       employeeSalary.estimatedPayable = estimatedPayable.toFixed(2);
       

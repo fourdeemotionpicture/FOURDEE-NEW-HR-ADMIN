@@ -115,9 +115,7 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2">
             <span className="badge badge-success">System Online</span>
           </div>
-        </motion.div>
-
-        {/* KPI Cards */}
+        </motion.div>        {/* KPI Cards */}
         {isEmployee ? (
           /* Employee Dashboard Views */
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
@@ -129,8 +127,20 @@ export default function DashboardPage() {
             <KpiCard icon={FileText} label="My Work Reports" value={data?.todayWorkReports ?? 0} sub={`${data?.monthlyWorkReports ?? 0} this month`} color="bg-cyan-50 text-cyan-600" delay={0.25} />
             <KpiCard icon={Calendar} label="My Attendance Days" value={data?.monthlyAttendance ?? 0} color="bg-violet-50 text-violet-600" delay={0.3} />
           </div>
+        ) : data?.userRole === "office_admin" ? (
+          /* Office Admin Dashboard Views (Admin stats + Salary, no petty cash/expenses) */
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+            <KpiCard icon={Users} label="Total Employees" value={data?.totalEmployees ?? 0} color="bg-blue-50 text-blue-600" delay={0} />
+            <KpiCard icon={UserCheck} label="Present Today" value={data?.presentToday ?? 0} sub={`${data?.todayWorkingHours ?? 0} hrs worked`} color="bg-emerald-50 text-emerald-600" delay={0.05} />
+            <KpiCard icon={UserX} label="Absent Today" value={data?.absentToday ?? 0} color="bg-red-50 text-red-600" delay={0.1} />
+            <KpiCard icon={AlertCircle} label="Late Today" value={data?.lateToday ?? 0} color="bg-amber-50 text-amber-600" delay={0.15} />
+            <KpiCard icon={IndianRupee} label="Monthly Salary (Base)" value={`₹${parseFloat(data?.employeeSalary?.monthlySalary ?? "0").toLocaleString()}`} color="bg-emerald-50 text-emerald-600" delay={0.2} />
+            <KpiCard icon={Wallet} label="Estimated Payable Salary" value={`₹${parseFloat(data?.employeeSalary?.estimatedPayable ?? "0").toLocaleString()}`} sub="Full salary (no attendance tracking)" color="bg-blue-50 text-blue-600" delay={0.25} />
+            <KpiCard icon={FileText} label="Work Reports Today" value={data?.todayWorkReports ?? 0} sub={`${data?.monthlyWorkReports ?? 0} this month`} color="bg-cyan-50 text-cyan-600" delay={0.3} />
+            <KpiCard icon={Calendar} label="Monthly Attendance" value={data?.monthlyAttendance ?? 0} color="bg-violet-50 text-violet-600" delay={0.35} />
+          </div>
         ) : (
-          /* Admin / Super Admin / Office Admin Dashboard Views */
+          /* Super Admin Dashboard Views (Admin stats + Petty Cash/Expenses) */
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
             <KpiCard icon={Users} label="Total Employees" value={data?.totalEmployees ?? 0} color="bg-blue-50 text-blue-600" delay={0} />
             <KpiCard icon={UserCheck} label="Present Today" value={data?.presentToday ?? 0} sub={`${data?.todayWorkingHours ?? 0} hrs worked`} color="bg-emerald-50 text-emerald-600" delay={0.05} />
@@ -215,7 +225,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Monthly Expenses Chart */}
-        {!isEmployee && (
+        {data?.userRole === "super_admin" && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
