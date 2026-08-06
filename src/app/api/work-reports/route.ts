@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Filter by user
-    if (currentUser.role === "employee") {
+    if (currentUser.role === "employee" || currentUser.role === "office_admin") {
       records = records.filter((r) => r.userId === currentUser.userId);
     } else if (userId) {
       records = records.filter((r) => r.userId === userId);

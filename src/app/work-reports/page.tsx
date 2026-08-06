@@ -19,20 +19,41 @@ export default function WorkReportsPage() {
   const [userRole, setUserRole] = useState("employee");
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
 
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
+
   const monthStr = format(currentMonth, "yyyy-MM");
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const res = await fetch(`/api/work-reports?month=${monthStr}`);
+    const userIdParam = selectedEmployeeId ? `&userId=${selectedEmployeeId}` : "";
+    const res = await fetch(`/api/work-reports?month=${monthStr}${userIdParam}`);
     const data = await res.json();
     setReports(data.workReports || []);
     setLoading(false);
-  }, [monthStr]);
+  }, [monthStr, selectedEmployeeId]);
 
   useEffect(() => {
     fetch("/api/auth/me").then((r) => r.json()).then((d) => { if (d.role) setUserRole(d.role); });
+  }, []);
+
+  useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    if (userRole === "super_admin" || userRole === "owner_admin") {
+      fetch("/api/employees")
+        .then((r) => r.json())
+        .then((d) => {
+          const list = d.employees || [];
+          setEmployees(list);
+          if (list.length > 0 && !selectedEmployeeId) {
+            setSelectedEmployeeId(list[0].id);
+          }
+        });
+    }
+  }, [userRole]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,6 +95,8 @@ export default function WorkReportsPage() {
     URL.revokeObjectURL(url);
   };
 
+  const isManager = userRole === "super_admin" || userRole === "owner_admin";
+
   return (
     <AppShell>
       <div className="space-y-6">
@@ -90,61 +113,140 @@ export default function WorkReportsPage() {
           </div>
         </motion.div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-4">
-          <div className="kpi-card"><p className="text-xs text-gray-500">Total Reports</p><p className="text-xl font-bold text-blue-600">{reports.length}</p></div>
-          <div className="kpi-card"><p className="text-xs text-gray-500">Days Reported</p><p className="text-xl font-bold text-emerald-600">{sortedDates.length}</p></div>
-          <div className="kpi-card"><p className="text-xs text-gray-500">This Month</p><p className="text-xl font-bold text-gray-900">{format(currentMonth, "MMM yyyy")}</p></div>
-        </div>
+        {isManager ? (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
+            <div className="card p-4 space-y-3 md:col-span-1">
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Employees</h3>
+              <div className="space-y-1.5 max-h-[500px] overflow-y-auto pr-1">
+                {employees.map((emp) => (
+                  <button
+                    key={emp.id}
+                    onClick={() => setSelectedEmployeeId(emp.id)}
+                    className={`w-full text-left p-3 rounded-xl border transition-all flex items-center gap-3 ${
+                      selectedEmployeeId === emp.id
+                        ? "border-blue-500 bg-blue-50/50 text-blue-900 shadow-sm"
+                        : "border-gray-100 bg-white text-gray-700 hover:bg-gray-50"
+                    }`}
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center font-bold text-blue-600 text-xs shrink-0">
+                      {emp.name.charAt(0)}
+                    </div>
+                    <div className="truncate">
+                      <p className="text-sm font-semibold truncate">{emp.name}</p>
+                      <p className="text-xs text-gray-500 truncate">{emp.designation || "Employee"}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
 
-        {/* Month selector */}
-        <div className="card p-4 flex items-center justify-between">
-          <input type="month" value={monthStr} onChange={(e) => { const d = parse(e.target.value, "yyyy-MM", new Date()); setCurrentMonth(d); }} className="input-field w-auto" />
-        </div>
+            <div className="md:col-span-3 space-y-6">
+              <div className="grid grid-cols-3 gap-4">
+                <div className="kpi-card"><p className="text-xs text-gray-500">Total Reports</p><p className="text-xl font-bold text-blue-600">{reports.length}</p></div>
+                <div className="kpi-card"><p className="text-xs text-gray-500">Days Reported</p><p className="text-xl font-bold text-emerald-600">{sortedDates.length}</p></div>
+                <div className="kpi-card"><p className="text-xs text-gray-500">This Month</p><p className="text-xl font-bold text-gray-900">{format(currentMonth, "MMM yyyy")}</p></div>
+              </div>
 
-        {/* Reports grouped by date */}
-        {loading ? (
-          <div className="text-center py-12 text-gray-400">Loading...</div>
-        ) : sortedDates.length === 0 ? (
-          <div className="card p-12 text-center text-gray-400">No work reports for this month</div>
-        ) : (
-          <div className="space-y-2">
-            {sortedDates.map((date) => (
-              <motion.div key={date} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="card overflow-hidden">
-                <button onClick={() => setExpandedDate(expandedDate === date ? null : date)} className="w-full px-5 py-3.5 flex items-center justify-between hover:bg-gray-50/50 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <Calendar className="w-4.5 h-4.5 text-gray-400" />
-                    <span className="text-sm font-semibold text-gray-900">{date}</span>
-                    <span className="badge badge-info">{groupedByDate[date].length} entries</span>
-                  </div>
-                  {expandedDate === date ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronRight className="w-4 h-4 text-gray-400" />}
-                </button>
-                {expandedDate === date && (
-                  <div className="border-t border-gray-100">
-                    {groupedByDate[date].map((report) => (
-                      <div key={report.id} className="px-5 py-3 border-b border-gray-50 last:border-0 flex items-start justify-between">
-                        <div className="flex-1">
-                          <p className="text-sm text-gray-900">{report.description}</p>
-                          {report.notes && <p className="text-xs text-gray-500 mt-0.5">{report.notes}</p>}
-                          {report.userName && (userRole === "super_admin" || userRole === "owner_admin") && <p className="text-xs text-blue-600 mt-0.5">By: {report.userName}</p>}
-                          {report.imageUrl && <a href={report.imageUrl} target="_blank" className="text-xs text-blue-500 hover:underline mt-0.5 inline-block">View Image</a>}
+              <div className="card p-4 flex items-center justify-between">
+                <input type="month" value={monthStr} onChange={(e) => { const d = parse(e.target.value, "yyyy-MM", new Date()); setCurrentMonth(d); }} className="input-field w-auto" />
+              </div>
+
+              {loading ? (
+                <div className="text-center py-12 text-gray-400">Loading...</div>
+              ) : sortedDates.length === 0 ? (
+                <div className="card p-12 text-center text-gray-400">No work reports for this month</div>
+              ) : (
+                <div className="space-y-2">
+                  {sortedDates.map((date) => (
+                    <motion.div key={date} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="card overflow-hidden">
+                      <button onClick={() => setExpandedDate(expandedDate === date ? null : date)} className="w-full px-5 py-3.5 flex items-center justify-between hover:bg-gray-50/50 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <Calendar className="w-4.5 h-4.5 text-gray-400" />
+                          <span className="text-sm font-semibold text-gray-900">{date}</span>
+                          <span className="badge badge-info">{groupedByDate[date].length} entries</span>
                         </div>
-                        {userRole !== "owner_admin" && (
-                          <button onClick={() => handleDelete(report.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors ml-2">
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </motion.div>
-            ))}
+                        {expandedDate === date ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronRight className="w-4 h-4 text-gray-400" />}
+                      </button>
+                      {expandedDate === date && (
+                        <div className="border-t border-gray-100">
+                          {groupedByDate[date].map((report) => (
+                            <div key={report.id} className="px-5 py-3 border-b border-gray-50 last:border-0 flex items-start justify-between">
+                              <div className="flex-1">
+                                <p className="text-sm text-gray-900">{report.description}</p>
+                                {report.notes && <p className="text-xs text-gray-500 mt-0.5">{report.notes}</p>}
+                                {report.userName && (userRole === "super_admin" || userRole === "owner_admin") && <p className="text-xs text-blue-600 mt-0.5">By: {report.userName}</p>}
+                                {report.imageUrl && <a href={report.imageUrl} target="_blank" className="text-xs text-blue-500 hover:underline mt-0.5 inline-block">View Image</a>}
+                              </div>
+                              {userRole !== "owner_admin" && (
+                                <button onClick={() => handleDelete(report.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors ml-2">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="kpi-card"><p className="text-xs text-gray-500">Total Reports</p><p className="text-xl font-bold text-blue-600">{reports.length}</p></div>
+              <div className="kpi-card"><p className="text-xs text-gray-500">Days Reported</p><p className="text-xl font-bold text-emerald-600">{sortedDates.length}</p></div>
+              <div className="kpi-card"><p className="text-xs text-gray-500">This Month</p><p className="text-xl font-bold text-gray-900">{format(currentMonth, "MMM yyyy")}</p></div>
+            </div>
+
+            <div className="card p-4 flex items-center justify-between">
+              <input type="month" value={monthStr} onChange={(e) => { const d = parse(e.target.value, "yyyy-MM", new Date()); setCurrentMonth(d); }} className="input-field w-auto" />
+            </div>
+
+            {loading ? (
+              <div className="text-center py-12 text-gray-400">Loading...</div>
+            ) : sortedDates.length === 0 ? (
+              <div className="card p-12 text-center text-gray-400">No work reports for this month</div>
+            ) : (
+              <div className="space-y-2">
+                {sortedDates.map((date) => (
+                  <motion.div key={date} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="card overflow-hidden">
+                    <button onClick={() => setExpandedDate(expandedDate === date ? null : date)} className="w-full px-5 py-3.5 flex items-center justify-between hover:bg-gray-50/50 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <Calendar className="w-4.5 h-4.5 text-gray-400" />
+                        <span className="text-sm font-semibold text-gray-900">{date}</span>
+                        <span className="badge badge-info">{groupedByDate[date].length} entries</span>
+                      </div>
+                      {expandedDate === date ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronRight className="w-4 h-4 text-gray-400" />}
+                    </button>
+                    {expandedDate === date && (
+                      <div className="border-t border-gray-100">
+                        {groupedByDate[date].map((report) => (
+                          <div key={report.id} className="px-5 py-3 border-b border-gray-50 last:border-0 flex items-start justify-between">
+                            <div className="flex-1">
+                              <p className="text-sm text-gray-900">{report.description}</p>
+                              {report.notes && <p className="text-xs text-gray-500 mt-0.5">{report.notes}</p>}
+                              {report.userName && (userRole === "super_admin" || userRole === "owner_admin") && <p className="text-xs text-blue-600 mt-0.5">By: {report.userName}</p>}
+                              {report.imageUrl && <a href={report.imageUrl} target="_blank" className="text-xs text-blue-500 hover:underline mt-0.5 inline-block">View Image</a>}
+                            </div>
+                            {userRole !== "owner_admin" && (
+                              <button onClick={() => handleDelete(report.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors ml-2">
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
 
-      {/* Add Report Modal */}
       <AnimatePresence>
         {showModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowModal(false)}>
