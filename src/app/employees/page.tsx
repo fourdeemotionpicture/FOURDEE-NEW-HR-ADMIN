@@ -7,7 +7,7 @@ import AppShell from "@/components/AppShell";
 import { format } from "date-fns";
 
 interface Employee {
-  id: string; name: string; email: string; role: string; designation: string; monthlySalary: string; dob?: string; isActive: boolean;
+  id: string; name: string; email: string; role: string; designation: string; monthlySalary: string; dob?: string; biometricId?: number | null; isActive: boolean;
 }
 
 export default function EmployeesPage() {
@@ -16,7 +16,7 @@ export default function EmployeesPage() {
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", email: "", password: "", role: "employee", designation: "", monthlySalary: "", dob: "" });
+  const [form, setForm] = useState({ name: "", email: "", password: "", role: "employee", designation: "", monthlySalary: "", dob: "", biometricId: "" });
 
   const fetchEmployees = async () => {
     const res = await fetch(`/api/employees?search=${search}`);
@@ -53,13 +53,13 @@ export default function EmployeesPage() {
     }
     setShowModal(false);
     setEditId(null);
-    setForm({ name: "", email: "", password: "", role: "employee", designation: "", monthlySalary: "", dob: "" });
+    setForm({ name: "", email: "", password: "", role: "employee", designation: "", monthlySalary: "", dob: "", biometricId: "" });
     fetchEmployees();
   };
 
   const handleEdit = (emp: Employee) => {
     setEditId(emp.id);
-    setForm({ name: emp.name, email: emp.email, password: "", role: emp.role, designation: emp.designation || "", monthlySalary: emp.monthlySalary || "", dob: emp.dob || "" });
+    setForm({ name: emp.name, email: emp.email, password: "", role: emp.role, designation: emp.designation || "", monthlySalary: emp.monthlySalary || "", dob: emp.dob || "", biometricId: emp.biometricId ? String(emp.biometricId) : "" });
     setShowModal(true);
   };
 
@@ -83,7 +83,7 @@ export default function EmployeesPage() {
             <p className="text-sm text-gray-500 mt-0.5">Manage team members and access</p>
           </div>
           {userRole !== "owner_admin" && (
-            <button onClick={() => { setShowModal(true); setEditId(null); setForm({ name: "", email: "", password: "", role: "employee", designation: "", monthlySalary: "", dob: "" }); }} className="btn-primary">
+            <button onClick={() => { setShowModal(true); setEditId(null); setForm({ name: "", email: "", password: "", role: "employee", designation: "", monthlySalary: "", dob: "", biometricId: "" }); }} className="btn-primary">
               <UserPlus className="w-4.5 h-4.5" /> Add Employee
             </button>
           )}
@@ -106,6 +106,7 @@ export default function EmployeesPage() {
                   <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Role</th>
                   <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Designation</th>
                   <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Salary</th>
+                  <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Biometric ID</th>
                   <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Date of Birth</th>
                   <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Status</th>
                   {userRole !== "owner_admin" && <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Actions</th>}
@@ -113,9 +114,9 @@ export default function EmployeesPage() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={userRole === "owner_admin" ? 7 : 8} className="text-center py-12 text-gray-400">Loading...</td></tr>
+                  <tr><td colSpan={userRole === "owner_admin" ? 8 : 9} className="text-center py-12 text-gray-400">Loading...</td></tr>
                 ) : employees.length === 0 ? (
-                  <tr><td colSpan={userRole === "owner_admin" ? 7 : 8} className="text-center py-12 text-gray-400">No employees found</td></tr>
+                  <tr><td colSpan={userRole === "owner_admin" ? 8 : 9} className="text-center py-12 text-gray-400">No employees found</td></tr>
                 ) : employees.map((emp) => (
                   <motion.tr key={emp.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                     <td className="px-5 py-3.5">
@@ -130,6 +131,7 @@ export default function EmployeesPage() {
                     <td className="px-5 py-3.5"><span className={`badge ${roleBadge(emp.role)}`}>{emp.role.replace("_", " ")}</span></td>
                     <td className="px-5 py-3.5 text-sm text-gray-600">{emp.designation || "-"}</td>
                     <td className="px-5 py-3.5 text-sm text-gray-600">₹{parseFloat(emp.monthlySalary || "0").toLocaleString()}</td>
+                    <td className="px-5 py-3.5 text-sm text-gray-600 font-mono text-blue-600">{emp.biometricId || "-"}</td>
                     <td className="px-5 py-3.5 text-sm text-gray-600">{emp.dob ? format(new Date(emp.dob), "MMM dd, yyyy") : "-"}</td>
                     <td className="px-5 py-3.5"><span className={`badge ${emp.isActive ? "badge-success" : "badge-danger"}`}>{emp.isActive ? "Active" : "Inactive"}</span></td>
                     {userRole !== "owner_admin" && (
@@ -190,6 +192,10 @@ export default function EmployeesPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
                   <input type="date" value={form.dob} onChange={(e) => setForm({ ...form, dob: e.target.value })} className="input-field" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Biometric Device User ID (User PIN)</label>
+                  <input type="number" value={form.biometricId} onChange={(e) => setForm({ ...form, biometricId: e.target.value })} className="input-field" placeholder="e.g. 101" />
                 </div>
                 <button type="submit" className="btn-primary w-full justify-center">{editId ? "Update Employee" : "Add Employee"}</button>
               </form>

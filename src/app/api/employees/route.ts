@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
       designation: users.designation,
       monthlySalary: users.monthlySalary,
       dob: users.dob,
+      biometricId: users.biometricId,
       isActive: users.isActive,
       createdAt: users.createdAt,
     }).from(users);
@@ -43,6 +44,7 @@ export async function GET(request: NextRequest) {
       designation: users.designation,
       monthlySalary: users.monthlySalary,
       dob: users.dob,
+      biometricId: users.biometricId,
       isActive: users.isActive,
       createdAt: users.createdAt,
     }).from(users);
@@ -79,7 +81,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, email, password, role, designation, monthlySalary, dob } = body;
+    const { name, email, password, role, designation, monthlySalary, dob, biometricId } = body;
 
     if (!name || !email || !password) {
       return NextResponse.json({ error: "Name, email, and password are required" }, { status: 400 });
@@ -95,6 +97,7 @@ export async function POST(request: NextRequest) {
       designation: designation || "",
       monthlySalary: monthlySalary || "0",
       dob: dob || null,
+      biometricId: biometricId ? parseInt(biometricId, 10) : null,
     }).returning();
 
     // Audit log
@@ -103,7 +106,7 @@ export async function POST(request: NextRequest) {
       action: "create",
       entity: "user",
       entityId: user.id,
-      details: { name, email, role, dob },
+      details: { name, email, role, dob, biometricId },
     });
 
     return NextResponse.json({
@@ -126,7 +129,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { id, name, role, designation, monthlySalary, isActive, password, dob } = body;
+    const { id, name, role, designation, monthlySalary, isActive, password, dob, biometricId } = body;
 
     if (!id) {
       return NextResponse.json({ error: "User ID is required" }, { status: 400 });
@@ -139,6 +142,7 @@ export async function PUT(request: NextRequest) {
     if (monthlySalary !== undefined) updateData.monthlySalary = monthlySalary;
     if (isActive !== undefined) updateData.isActive = isActive;
     if (dob !== undefined) updateData.dob = dob || null;
+    if (biometricId !== undefined) updateData.biometricId = biometricId ? parseInt(biometricId, 10) : null;
     if (password) updateData.passwordHash = await hashPassword(password);
 
     const [updated] = await db.update(users).set(updateData).where(eq(users.id, id)).returning();

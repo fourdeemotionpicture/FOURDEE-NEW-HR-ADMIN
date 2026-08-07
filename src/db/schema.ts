@@ -10,6 +10,7 @@ export const users = pgTable("users", {
   designation: varchar("designation", { length: 255 }),
   monthlySalary: numeric("monthly_salary", { precision: 12, scale: 2 }).default("0"),
   dob: date("dob"),
+  biometricId: integer("biometric_id").unique(),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
