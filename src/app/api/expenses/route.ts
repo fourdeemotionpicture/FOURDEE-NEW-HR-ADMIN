@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, hasPermission } from "@/lib/auth";
 import { db } from "@/db";
 import { expenses, pettyCash, users } from "@/db/schema";
-import { eq, gte, lte, desc, sql } from "drizzle-orm";
+import { eq, gte, lte, desc, sql, and } from "drizzle-orm";
 import { format, startOfMonth, endOfMonth, startOfDay, endOfDay, parse } from "date-fns";
 
 export async function GET(request: NextRequest) {
