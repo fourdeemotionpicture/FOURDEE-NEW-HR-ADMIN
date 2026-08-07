@@ -5,7 +5,7 @@ import { jwtVerify } from "jose";
 const SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "four-dee-erp-secret-key-2024-change-in-production");
 const COOKIE_NAME = "fd_erp_token";
 
-const publicPaths = ["/login", "/setup", "/api/auth/login", "/api/setup", "/api/health"];
+const publicPaths = ["/login", "/setup", "/api/auth/login", "/api/setup", "/api/health", "/api/attendance/biometric"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
