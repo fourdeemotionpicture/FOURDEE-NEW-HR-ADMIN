@@ -8,7 +8,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths,
 
 interface AttendanceRecord {
   id: string; userId: string; date: string; inTime: string | null; outTime: string | null;
-  status: string; source: string; lateMinutes: number | null; workingHours: string | null; overtimeMinutes: number | null; userName?: string;
+  status: string; source: string; lateMinutes: number | null; workingHours: string | null; overtimeMinutes: number | null; userName?: string; notes?: string | null;
 }
 
 const STATUS_COLORS: Record<string, string> = {
