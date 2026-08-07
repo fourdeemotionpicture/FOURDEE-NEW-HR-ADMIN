@@ -10,30 +10,37 @@ const OFFICE_START = "10:00";
 const GRACE_PERIOD_END = "10:15";
 const REQUIRED_WORKING_HOURS = 8;
 
-function calculateAttendance(inTime: string, outTime: string) {
+export function calculateAttendance(inTime: string, outTime: string) {
   const inDate = parse(inTime, "HH:mm", new Date());
   const outDate = parse(outTime, "HH:mm", new Date());
-  const graceDate = parse(GRACE_PERIOD_END, "HH:mm", new Date());
-  const officeStartDate = parse(OFFICE_START, "HH:mm", new Date());
 
   const totalMinutes = differenceInMinutes(outDate, inDate);
   const workingHours = Math.max(0, totalMinutes / 60);
 
-  // Late calculation
   let lateMinutes = 0;
-  if (inDate > graceDate) {
-    lateMinutes = differenceInMinutes(inDate, graceDate);
+  let status = "present";
+
+  if (workingHours >= 8.0) {
+    // 8 Hours completed: Full present, no late minutes!
+    status = "present";
+    lateMinutes = 0;
+  } else {
+    // Less than 8 hours: status is half_day
+    status = "half_day";
+    // Check if check-in time is 10:15 AM or later (i.e. lateMinutes applies from 10:00 AM)
+    const inHours = inDate.getHours();
+    const inMins = inDate.getMinutes();
+    const inTotalMins = inHours * 60 + inMins;
+
+    if (inTotalMins >= 615) {
+      lateMinutes = inTotalMins - 600; // 600 mins is 10:00 AM
+    }
   }
 
   // Overtime calculation
-  const standardEndMinutes = 10 * 60 + REQUIRED_WORKING_HOURS * 60; // 6:00 PM in minutes
+  const standardEndMinutes = 10 * 60 + REQUIRED_WORKING_HOURS * 60; // 6:00 PM (10:00 AM + 8h)
   const outMinutes = outDate.getHours() * 60 + outDate.getMinutes();
   const overtimeMinutes = Math.max(0, outMinutes - standardEndMinutes);
-
-  // Status
-  let status = "present";
-  if (workingHours < 4) status = "half_day";
-  if (workingHours < 2) status = "absent";
 
   return {
     workingHours: workingHours.toFixed(2),
@@ -98,9 +105,10 @@ export async function POST(request: NextRequest) {
     }
 
     const today = format(new Date(), "yyyy-MM-dd");
+    const canOverride = currentUser.role === "super_admin" || currentUser.role === "owner_admin";
 
     // Validation rules for manual attendance
-    if (source === "manual" && currentUser.role !== "super_admin") {
+    if (source === "manual" && !canOverride) {
       // Cannot submit for future dates
       if (date > today) {
         return NextResponse.json({ error: "Cannot submit attendance for future dates" }, { status: 400 });
@@ -121,7 +129,7 @@ export async function POST(request: NextRequest) {
     const cleanInTime = inTime.slice(0, 5);
     const cleanOutTime = outTime.slice(0, 5);
     const calculations = calculateAttendance(cleanInTime, cleanOutTime);
-    const targetUserId = currentUser.role === "super_admin" && userId ? userId : currentUser.userId;
+    const targetUserId = canOverride && userId ? userId : currentUser.userId;
 
     // Check if attendance already exists
     const existing = await db.select().from(attendance).where(
@@ -143,7 +151,7 @@ export async function POST(request: NextRequest) {
       }).where(eq(attendance.id, existing[0].id)).returning();
 
       // Audit log for admin override
-      if (currentUser.role === "super_admin") {
+      if (canOverride) {
         await db.insert(auditLogs).values({
           userId: currentUser.userId,
           action: "attendance_override",

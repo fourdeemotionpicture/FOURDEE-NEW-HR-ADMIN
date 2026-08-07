@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { attendance, users } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
+import { calculateAttendance } from "@/app/api/attendance/route";
 
 export async function POST(request: NextRequest) {
   try {
@@ -53,7 +54,9 @@ export async function POST(request: NextRequest) {
         // First punch of the day: Clock In
         const [inHours, inMins] = time.split(":").map(Number);
         const inMinsTotal = inHours * 60 + inMins;
-        const lateMinutes = Math.max(0, inMinsTotal - 600); // 10:00 AM standard in time
+        
+        // Late applies from 10:00 AM (600 mins) only if checking in at or after 10:15 AM (615 mins)
+        const lateMinutes = inMinsTotal >= 615 ? (inMinsTotal - 600) : 0;
 
         await db.insert(attendance).values({
           userId: user.id,
@@ -66,8 +69,10 @@ export async function POST(request: NextRequest) {
           workingHours: "0.00",
           overtimeMinutes: 0,
         });
+
+        console.log(`[Biometric API] Inserted new entry for ${user.name}: Date=${date}, InTime=${time}, LateMinutes=${lateMinutes}`);
       } else {
-        // Existing punch: Update In/Out Time & recalculate hours
+        // Existing punch: Update In/Out Time & recalculate hours using the global calculateAttendance logic
         let currentInTime = existing.inTime || time;
         let currentOutTime = existing.outTime || time;
 
@@ -89,31 +94,20 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Recalculate Working Hours and Overtime
-        let workingHours = "0.00";
-        let overtimeMinutes = 0;
-
-        const [finalInH, finalInM] = currentInTime.split(":").map(Number);
-        const [finalOutH, finalOutM] = currentOutTime.split(":").map(Number);
-        const diffMins = (finalOutH * 60 + finalOutM) - (finalInH * 60 + finalInM);
-        
-        if (diffMins > 0) {
-          workingHours = (diffMins / 60).toFixed(2);
-          // Standard shift is 8 hours (480 minutes)
-          overtimeMinutes = Math.max(0, diffMins - 480);
-        }
-
-        // Recalculate late minutes based on inTime
-        const finalInMinsTotal = finalInH * 60 + finalInM;
-        const lateMinutes = Math.max(0, finalInMinsTotal - 600);
+        // Apply updated calculation helper
+        const calcs = calculateAttendance(currentInTime, currentOutTime);
 
         await db.update(attendance).set({
           inTime: currentInTime,
           outTime: currentOutTime,
-          workingHours,
-          overtimeMinutes,
-          lateMinutes,
+          workingHours: calcs.workingHours,
+          overtimeMinutes: calcs.overtimeMinutes,
+          lateMinutes: calcs.lateMinutes,
+          status: calcs.status,
+          updatedAt: new Date(),
         }).where(eq(attendance.id, existing.id));
+
+        console.log(`[Biometric API] Updated entry for ${user.name}: Date=${date}, InTime=${currentInTime}, OutTime=${currentOutTime}, WorkingHours=${calcs.workingHours}, Status=${calcs.status}, LateMinutes=${calcs.lateMinutes}`);
       }
 
       processedCount++;

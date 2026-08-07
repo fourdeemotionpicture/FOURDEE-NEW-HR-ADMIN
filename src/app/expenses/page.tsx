@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Receipt, Plus, Wallet, TrendingDown, X, ChevronDown, ChevronRight } from "lucide-react";
+import { Receipt, Plus, Wallet, TrendingDown, X, ChevronDown, ChevronRight, Trash2 } from "lucide-react";
 import AppShell from "@/components/AppShell";
 import { format } from "date-fns";
 
@@ -79,6 +79,14 @@ export default function ExpensesPage() {
   }, {});
   const sortedDates = Object.keys(groupedByDate).sort((a, b) => b.localeCompare(a));
 
+  const handleDelete = async (id: string, type: "expense" | "petty_cash") => {
+    if (!window.confirm("Are you sure you want to delete this transaction? This will also revert the balance history.")) return;
+    await fetch(`/api/expenses?id=${id}&type=${type}`, {
+      method: "DELETE",
+    });
+    fetchData();
+  };
+
   const handleExport = () => {
     const headers = ["Date", "Paid To", "Amount", "Notes", "Balance After"];
     const rows = expenses.map((e) => [e.date, e.paidTo, e.amount, e.notes || "", e.balanceAfter || ""]);
@@ -153,11 +161,18 @@ export default function ExpensesPage() {
                     <p className="text-xs text-gray-500">{entry.date}</p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className={`text-sm font-medium ${entry.type === "received" ? "text-emerald-600" : "text-red-600"}`}>
-                    {entry.type === "received" ? "+" : "-"}₹{Math.abs(parseFloat(entry.amount)).toLocaleString()}
-                  </p>
-                  <p className="text-xs text-gray-500">Bal: ₹{parseFloat(entry.balanceAfter ?? "0").toLocaleString()}</p>
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <p className={`text-sm font-medium ${entry.type === "received" ? "text-emerald-600" : "text-red-600"}`}>
+                      {entry.type === "received" ? "+" : "-"}₹{Math.abs(parseFloat(entry.amount)).toLocaleString()}
+                    </p>
+                    <p className="text-xs text-gray-500">Bal: ₹{parseFloat(entry.balanceAfter ?? "0").toLocaleString()}</p>
+                  </div>
+                  {userRole === "super_admin" && (
+                    <button onClick={() => handleDelete(entry.id, "petty_cash")} className="p-1.5 rounded-lg hover:bg-red-50 text-red-500 transition-colors" title="Delete entry">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -196,9 +211,16 @@ export default function ExpensesPage() {
                             {exp.notes && <p className="text-xs text-gray-500">{exp.notes}</p>}
                             {exp.createdByName && <p className="text-xs text-blue-600">By: {exp.createdByName}</p>}
                           </div>
-                          <div className="text-right">
-                            <p className="text-sm font-medium text-red-600">₹{parseFloat(exp.amount ?? "0").toLocaleString()}</p>
-                            <p className="text-xs text-gray-500">Bal: ₹{parseFloat(exp.balanceAfter ?? "0").toLocaleString()}</p>
+                          <div className="flex items-center gap-3">
+                            <div className="text-right">
+                              <p className="text-sm font-medium text-red-600">₹{parseFloat(exp.amount ?? "0").toLocaleString()}</p>
+                              <p className="text-xs text-gray-500">Bal: ₹{parseFloat(exp.balanceAfter ?? "0").toLocaleString()}</p>
+                            </div>
+                            {userRole === "super_admin" && (
+                              <button onClick={() => handleDelete(exp.id, "expense")} className="p-1.5 rounded-lg hover:bg-red-50 text-red-500 transition-colors" title="Delete expense">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
                           </div>
                         </div>
                       ))}

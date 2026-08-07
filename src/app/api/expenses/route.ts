@@ -150,18 +150,83 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const currentUser = await getCurrentUser();
-    if (!currentUser || (currentUser.role !== "super_admin" && currentUser.role !== "office_admin")) {
+    if (!currentUser || currentUser.role !== "super_admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
+    const type = searchParams.get("type") || "expense"; // "expense" or "petty_cash"
 
     if (!id) {
-      return NextResponse.json({ error: "Expense ID is required" }, { status: 400 });
+      return NextResponse.json({ error: "ID is required" }, { status: 400 });
     }
 
-    await db.delete(expenses).where(eq(expenses.id, id));
+    if (type === "petty_cash") {
+      const pc = await db.query.pettyCash.findFirst({
+        where: eq(pettyCash.id, id),
+      });
+
+      if (pc) {
+        // If this petty cash was created as part of an expense, delete the matching expense too
+        if (pc.type === "expense") {
+          const matchExp = await db.query.expenses.findFirst({
+            where: and(
+              eq(expenses.date, pc.date),
+              eq(expenses.amount, sql`abs(${pettyCash.amount})`),
+              eq(expenses.createdBy, pc.createdBy)
+            ),
+          });
+          if (matchExp) {
+            await db.delete(expenses).where(eq(expenses.id, matchExp.id));
+          }
+        }
+
+        // Delete petty cash record
+        await db.delete(pettyCash).where(eq(pettyCash.id, id));
+
+        // Shift balances for all subsequent records
+        const amount = parseFloat(pc.amount);
+        const subsequent = await db.select().from(pettyCash).where(gte(pettyCash.createdAt, pc.createdAt)).orderBy(pettyCash.createdAt);
+        for (const sub of subsequent) {
+          const newBal = parseFloat(sub.balanceAfter ?? "0") - amount;
+          await db.update(pettyCash).set({ balanceAfter: newBal.toFixed(2) }).where(eq(pettyCash.id, sub.id));
+        }
+      }
+    } else {
+      // Regular expense deletion
+      const exp = await db.query.expenses.findFirst({
+        where: eq(expenses.id, id),
+      });
+
+      if (exp) {
+        // Find corresponding petty cash entry
+        const matchPC = await db.query.pettyCash.findFirst({
+          where: and(
+            eq(pettyCash.date, exp.date),
+            eq(pettyCash.amount, (-parseFloat(exp.amount)).toFixed(2)),
+            eq(pettyCash.createdBy, exp.createdBy)
+          ),
+        });
+
+        if (matchPC) {
+          // Delete matching petty cash record
+          await db.delete(pettyCash).where(eq(pettyCash.id, matchPC.id));
+
+          // Shift balances for all subsequent records
+          const amount = parseFloat(matchPC.amount); // negative number
+          const subsequent = await db.select().from(pettyCash).where(gte(pettyCash.createdAt, matchPC.createdAt)).orderBy(pettyCash.createdAt);
+          for (const sub of subsequent) {
+            const newBal = parseFloat(sub.balanceAfter ?? "0") - amount;
+            await db.update(pettyCash).set({ balanceAfter: newBal.toFixed(2) }).where(eq(pettyCash.id, sub.id));
+          }
+        }
+
+        // Delete the main expense entry
+        await db.delete(expenses).where(eq(expenses.id, id));
+      }
+    }
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Expenses DELETE error:", error);
