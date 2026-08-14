@@ -107,3 +107,17 @@ export const manualAttendanceRequests = pgTable("manual_attendance_requests", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+// ─── Fanpage Work ──────────────────────────────────────────────────────────
+export const fanpageWork = pgTable("fanpage_work", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  platform: varchar("platform", { length: 50 }).notNull(), // Instagram, X, YouTube
+  pageHandle: varchar("page_handle", { length: 255 }).notNull(), // e.g. @team_simran
+  date: date("date").notNull(),
+  workDescription: text("work_description").notNull(),
+  postLink: text("post_link"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+

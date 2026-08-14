@@ -62,17 +62,17 @@ export function hasPermission(role: string, permission: string): boolean {
     super_admin: [
       "dashboard", "employees", "attendance", "salary", "work_reports",
       "announcements", "expenses", "reports", "settings", "manual_attendance_override",
-      "role_management", "export", "audit_logs"
+      "role_management", "export", "audit_logs", "fanpage_work"
     ],
     owner_admin: [
       "dashboard", "employees", "attendance", "salary", "work_reports",
-      "announcements", "expenses", "reports", "export"
+      "announcements", "expenses", "reports", "export", "fanpage_work"
     ],
     office_admin: [
-      "dashboard", "attendance_own", "work_reports_own", "announcements_view", "expenses"
+      "dashboard", "attendance_own", "work_reports_own", "announcements_view", "expenses", "fanpage_work_own"
     ],
     employee: [
-      "dashboard", "attendance_own", "work_reports_own", "announcements_view"
+      "dashboard", "attendance_own", "work_reports_own", "announcements_view", "fanpage_work_own"
     ],
   };
   return permissions[role]?.includes(permission) ?? false;

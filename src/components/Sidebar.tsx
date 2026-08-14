@@ -16,6 +16,7 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  Share2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -33,6 +34,7 @@ const menuItems = [
   { label: "Announcements", href: "/announcements", icon: Megaphone, roles: ["super_admin", "owner_admin", "office_admin", "employee"] },
   { label: "Expenses", href: "/expenses", icon: Receipt, roles: ["super_admin", "owner_admin", "office_admin"] },
   { label: "Reports", href: "/reports", icon: BarChart3, roles: ["super_admin", "owner_admin"] },
+  { label: "Fanpage Work", href: "/fanpage-work", icon: Share2, roles: ["super_admin", "owner_admin", "office_admin", "employee"] },
 ];
 
 export default function Sidebar({ userRole, userName }: SidebarProps) {
