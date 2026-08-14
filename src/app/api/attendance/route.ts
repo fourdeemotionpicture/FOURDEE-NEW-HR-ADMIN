@@ -11,8 +11,10 @@ const GRACE_PERIOD_END = "10:15";
 const REQUIRED_WORKING_HOURS = 8;
 
 export function calculateAttendance(inTime: string, outTime: string) {
-  const inDate = parse(inTime, "HH:mm", new Date());
-  const outDate = parse(outTime, "HH:mm", new Date());
+  const cleanIn = inTime.slice(0, 5);
+  const cleanOut = outTime.slice(0, 5);
+  const inDate = parse(cleanIn, "HH:mm", new Date());
+  const outDate = parse(cleanOut, "HH:mm", new Date());
 
   const totalMinutes = differenceInMinutes(outDate, inDate);
   const workingHours = Math.max(0, totalMinutes / 60);
