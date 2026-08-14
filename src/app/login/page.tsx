@@ -51,11 +51,8 @@ export default function LoginPage() {
 
       <div className="relative w-full max-w-md mx-4 animate-scale-in">
         {/* Logo / Brand */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-700 shadow-lg shadow-blue-500/25 mb-4">
-            <span className="text-2xl font-bold text-white">4D</span>
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Four Dee Motion Picture</h1>
+        <div className="text-center mb-8 flex flex-col items-center justify-center">
+          <img src="/logo.png" alt="Four Dee Logo" className="h-32 w-auto object-contain mb-3" />
           <p className="text-sm text-gray-500 mt-1">Office ERP & Employee Management</p>
         </div>
 

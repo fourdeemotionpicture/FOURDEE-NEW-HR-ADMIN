@@ -56,23 +56,13 @@ export default function Sidebar({ userRole, userName }: SidebarProps) {
       className="h-screen bg-white border-r border-gray-100 flex flex-col fixed left-0 top-0 z-30 shadow-sm"
     >
       {/* Logo */}
-      <div className="h-16 flex items-center px-4 border-b border-gray-100">
-        <Link href="/dashboard" className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center shadow-md shadow-blue-500/20 flex-shrink-0">
-            <span className="text-sm font-bold text-white">4D</span>
-          </div>
-          <AnimatePresence>
-            {!collapsed && (
-              <motion.div
-                initial={{ opacity: 0, width: 0 }}
-                animate={{ opacity: 1, width: "auto" }}
-                exit={{ opacity: 0, width: 0 }}
-                className="overflow-hidden whitespace-nowrap"
-              >
-                <span className="text-sm font-bold text-gray-900">Four Dee ERP</span>
-              </motion.div>
-            )}
-          </AnimatePresence>
+      <div className="h-16 flex items-center justify-center px-4 border-b border-gray-100">
+        <Link href="/dashboard" className="flex items-center justify-center w-full">
+          {collapsed ? (
+            <img src="/logo.png" alt="Four Dee Logo" className="w-10 h-10 object-contain" />
+          ) : (
+            <img src="/logo.png" alt="Four Dee Logo" className="h-12 w-auto max-w-[180px] object-contain" />
+          )}
         </Link>
       </div>
 
