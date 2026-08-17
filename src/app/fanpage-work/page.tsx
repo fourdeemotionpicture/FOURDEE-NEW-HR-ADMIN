@@ -419,65 +419,92 @@ export default function FanpageWorkPage() {
             ) : records.length === 0 ? (
               <div className="text-center py-12 text-gray-400 card">No fanpage work logs submitted for this selection/month.</div>
             ) : (
-              <div className="space-y-4">
-                {records.map((rec) => (
-                  <motion.div
-                    key={rec.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="card p-5 hover:shadow-md transition-shadow relative overflow-hidden"
-                  >
-                    {/* Platform Accent Color Bar */}
-                    <div className={`absolute top-0 left-0 w-1.5 h-full ${
-                      rec.platform === "Instagram" ? "bg-gradient-to-b from-pink-500 to-purple-600" :
-                      rec.platform === "X" ? "bg-slate-900" : "bg-red-600"
-                    }`} />
-                    
-                    <div className="flex justify-between items-start pl-2">
-                      <div className="space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
-                            rec.platform === "Instagram" ? "bg-pink-50 text-pink-700 border border-pink-100" :
-                            rec.platform === "X" ? "bg-slate-50 text-slate-700 border border-slate-200" :
-                            "bg-red-50 text-red-700 border border-red-100"
-                          }`}>{rec.platform}</span>
-                          <span className="text-sm font-semibold text-blue-600">{rec.pageHandle}</span>
-                          <span className="text-xs text-gray-400 font-medium">• {format(new Date(rec.date), "MMM dd, yyyy")}</span>
-                        </div>
-                        
-                        <p className="text-sm text-gray-700 pt-2 whitespace-pre-line">{rec.workDescription}</p>
-                        
-                        {rec.postLink && (
-                          <div className="pt-2">
-                            <a
-                              href={rec.postLink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-xs text-blue-600 font-medium hover:underline bg-blue-50/50 px-2.5 py-1 rounded-lg border border-blue-50"
-                            >
-                              View Published Post <ExternalLink className="w-3 h-3" />
-                            </a>
-                          </div>
-                        )}
-                      </div>
+              <div className="space-y-6">
+                {(() => {
+                  const grouped: Record<string, FanpageWorkRecord[]> = {};
+                  records.forEach((rec) => {
+                    if (!grouped[rec.date]) {
+                      grouped[rec.date] = [];
+                    }
+                    grouped[rec.date].push(rec);
+                  });
 
-                      <div className="flex flex-col items-end gap-2 text-right">
-                        {isManager && (
-                          <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">By: {rec.userName}</span>
-                        )}
-                        {(userRole === "super_admin" || currentUser?.id === rec.userId) && (
-                          <button
-                            onClick={() => handleDelete(rec.id)}
-                            className="p-1 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                            title="Delete Log"
+                  const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+
+                  return sortedDates.map((dateStr) => (
+                    <div key={dateStr} className="space-y-3">
+                      <div className="flex items-center gap-2 border-b border-gray-200/60 pb-1.5 pt-1">
+                        <Calendar className="w-4 h-4 text-blue-600" />
+                        <span className="text-sm font-bold text-gray-800">
+                          {format(parse(dateStr, "yyyy-MM-dd", new Date()), "EEEE, MMMM dd, yyyy")}
+                        </span>
+                        <span className="text-[10px] text-gray-500 bg-gray-100/80 px-2 py-0.5 rounded-full border border-gray-200/50 font-medium">
+                          {grouped[dateStr].length} {grouped[dateStr].length === 1 ? "entry" : "entries"}
+                        </span>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        {grouped[dateStr].map((rec) => (
+                          <motion.div
+                            key={rec.id}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="card p-5 hover:shadow-md transition-shadow relative overflow-hidden"
                           >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
+                            {/* Platform Accent Color Bar */}
+                            <div className={`absolute top-0 left-0 w-1.5 h-full ${
+                              rec.platform === "Instagram" ? "bg-gradient-to-b from-pink-500 to-purple-600" :
+                              rec.platform === "X" ? "bg-slate-900" : "bg-red-600"
+                            }`} />
+                            
+                            <div className="flex justify-between items-start pl-2">
+                              <div className="space-y-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                                    rec.platform === "Instagram" ? "bg-pink-50 text-pink-700 border border-pink-100" :
+                                    rec.platform === "X" ? "bg-slate-50 text-slate-700 border border-slate-200" :
+                                    "bg-red-50 text-red-700 border border-red-100"
+                                  }`}>{rec.platform}</span>
+                                  <span className="text-sm font-semibold text-blue-600">{rec.pageHandle}</span>
+                                </div>
+                                
+                                <p className="text-sm text-gray-700 pt-2 whitespace-pre-line">{rec.workDescription}</p>
+                                
+                                {rec.postLink && (
+                                  <div className="pt-2">
+                                    <a
+                                      href={rec.postLink}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 text-xs text-blue-600 font-medium hover:underline bg-blue-50/50 px-2.5 py-1 rounded-lg border border-blue-50"
+                                    >
+                                      View Published Post <ExternalLink className="w-3 h-3" />
+                                    </a>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex flex-col items-end gap-2 text-right">
+                                {isManager && (
+                                  <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">By: {rec.userName}</span>
+                                )}
+                                {(userRole === "super_admin" || currentUser?.id === rec.userId) && (
+                                  <button
+                                    onClick={() => handleDelete(rec.id)}
+                                    className="p-1 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                    title="Delete Log"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </motion.div>
+                        ))}
                       </div>
                     </div>
-                  </motion.div>
-                ))}
+                  ));
+                })()}
               </div>
             )}
           </div>
