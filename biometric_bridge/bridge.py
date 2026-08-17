@@ -17,7 +17,7 @@ except ImportError:
 # 2. Configuration Settings (Change these to match your office network)
 DEVICE_IP = "192.168.1.201"      # The local IP address of your eSSL machine
 DEVICE_PORT = 4370               # Default port is 4370
-WEBSITE_URL = "https://fourdee-new-hr-admin-fdmp.vercel.app/api/attendance/biometric"
+WEBSITE_URL = "https://fourdee-new-hr-admin-taupe.vercel.app/api/attendance/biometric"
 SECRET_KEY = "FourDeeBiometricSecret2026!"
 
 LAST_RUN_FILE = "last_timestamp.txt"
