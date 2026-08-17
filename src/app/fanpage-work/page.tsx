@@ -64,7 +64,7 @@ export default function FanpageWorkPage() {
   const [userRole, setUserRole] = useState("employee");
   const [currentUser, setCurrentUser] = useState<{ id: string; name: string } | null>(null);
   const [currentMonth, setCurrentMonth] = useState(format(new Date(), "yyyy-MM"));
-  const [selectedDate, setSelectedDate] = useState<string>("");
+  const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), "yyyy-MM-dd"));
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({
@@ -82,21 +82,28 @@ export default function FanpageWorkPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     const targetUserId = selectedEmployeeId || "";
-    const url = selectedDate
-      ? `/api/fanpage-work?date=${selectedDate}&userId=${targetUserId}`
-      : `/api/fanpage-work?month=${currentMonth}&userId=${targetUserId}`;
+    const dateParam = selectedDate || format(new Date(), "yyyy-MM-dd");
+    const url = `/api/fanpage-work?date=${dateParam}&userId=${targetUserId}`;
     const res = await fetch(url);
     const data = await res.json();
     setRecords(data.fanpageWork || []);
     setLoading(false);
-  }, [currentMonth, selectedDate, selectedEmployeeId]);
+  }, [selectedDate, selectedEmployeeId]);
 
-  const exportToExcel = () => {
-    if (records.length === 0) {
-      alert("No logs to export");
+  const exportToExcel = async () => {
+    setLoading(true);
+    const targetUserId = selectedEmployeeId || "";
+    const res = await fetch(`/api/fanpage-work?month=${currentMonth}&userId=${targetUserId}`);
+    const data = await res.json();
+    setLoading(false);
+    
+    const monthRecords = data.fanpageWork || [];
+    if (monthRecords.length === 0) {
+      alert("No logs to export for this month");
       return;
     }
-    const data = records.map((r) => ({
+    
+    const exportData = monthRecords.map((r) => ({
       "Date": r.date,
       "Employee Name": r.userName || "Unknown",
       "Platform": r.platform,
@@ -104,11 +111,11 @@ export default function FanpageWorkPage() {
       "Work Done": r.workDescription,
       "Post Link": r.postLink || "N/A"
     }));
-    const worksheet = XLSX.utils.json_to_sheet(data);
+    
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Fanpage Work Logs");
     
-    // Set column widths
     worksheet["!cols"] = [
       { wch: 12 }, // Date
       { wch: 20 }, // Employee Name
@@ -118,7 +125,7 @@ export default function FanpageWorkPage() {
       { wch: 40 }  // Post Link
     ];
 
-    const fileName = `Fanpage_Work_Logs_${selectedDate || currentMonth || "Report"}.xlsx`;
+    const fileName = `Fanpage_Work_Logs_${currentMonth}.xlsx`;
     XLSX.writeFile(workbook, fileName);
   };
 
@@ -366,50 +373,36 @@ export default function FanpageWorkPage() {
               <div className="flex flex-wrap items-center gap-4">
                 <div className="flex items-center gap-2">
                   <Calendar className="w-5 h-5 text-gray-400" />
-                  <span className="text-sm font-medium text-gray-700">Filter Month</span>
-                  <input
-                    type="month"
-                    value={currentMonth}
-                    onChange={(e) => {
-                      setCurrentMonth(e.target.value);
-                      setSelectedDate(""); // Clear date filter when switching month
-                    }}
-                    className="input-field py-1 px-3 text-sm w-auto"
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-gray-700">Or Select Date</span>
+                  <span className="text-sm font-semibold text-gray-800">Select Date to View</span>
                   <input
                     type="date"
                     value={selectedDate}
                     onChange={(e) => {
-                      setSelectedDate(e.target.value);
-                      if (e.target.value) {
-                        setCurrentMonth(e.target.value.substring(0, 7));
-                      }
+                      setSelectedDate(e.target.value || format(new Date(), "yyyy-MM-dd"));
                     }}
                     className="input-field py-1 px-3 text-sm w-auto"
                   />
-                  {selectedDate && (
-                    <button
-                      onClick={() => setSelectedDate("")}
-                      className="text-xs text-red-600 hover:text-red-800 font-medium ml-1"
-                    >
-                      Clear Date
-                    </button>
-                  )}
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                <div className="text-sm text-gray-500 font-medium">
-                  Total Logs: <span className="text-blue-600 font-semibold">{records.length} Entries</span>
+                <div className="flex items-center gap-2 border-r border-gray-100 pr-4">
+                  <span className="text-xs font-semibold text-gray-600">Export Month</span>
+                  <input
+                    type="month"
+                    value={currentMonth}
+                    onChange={(e) => setCurrentMonth(e.target.value)}
+                    className="input-field py-1 px-2 text-xs w-auto"
+                  />
+                  <button
+                    onClick={exportToExcel}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-colors"
+                  >
+                    <FileText className="w-3.5 h-3.5" /> Export Excel
+                  </button>
                 </div>
-                <button
-                  onClick={exportToExcel}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-sm transition-colors"
-                >
-                  <FileText className="w-3.5 h-3.5" /> Export Excel
-                </button>
+                <div className="text-xs text-gray-500 font-medium">
+                  {records.length} {records.length === 1 ? "Post" : "Posts"} on this Date
+                </div>
               </div>
             </div>
 
