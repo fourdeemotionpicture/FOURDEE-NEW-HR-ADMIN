@@ -312,7 +312,7 @@ export default function FanpageWorkPage() {
           
           {/* Master Sidebar (For Admins) */}
           {isManager && (
-            <div className="card p-4 space-y-4 lg:col-span-1 h-[calc(100vh-340px)] flex flex-col">
+            <div className="card p-4 space-y-4 lg:col-span-1 h-60 lg:h-[calc(100vh-340px)] flex flex-col">
               <div>
                 <h3 className="font-semibold text-gray-900 text-sm">Employees</h3>
                 <p className="text-xs text-gray-400 mt-0.5">Filter page works by member</p>
@@ -366,7 +366,7 @@ export default function FanpageWorkPage() {
           )}
 
           {/* Details Feed */}
-          <div className={`${isManager ? "lg:col-span-3" : ""} space-y-4 overflow-y-auto h-[calc(100vh-340px)] pr-2`}>
+          <div className={`${isManager ? "lg:col-span-3" : ""} space-y-4 overflow-y-auto h-auto lg:h-[calc(100vh-340px)] pr-2`}>
             
             {/* Filter Bar */}
             <div className="card p-4 flex flex-wrap items-center justify-between gap-4">

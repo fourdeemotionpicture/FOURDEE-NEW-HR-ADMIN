@@ -163,7 +163,7 @@ export default function AttendancePage() {
           
           {/* Master Sidebar (For Super Admin and Owner Admin) */}
           {isManager && (
-            <div className="card p-4 space-y-4 lg:col-span-1 h-[calc(100vh-220px)] flex flex-col">
+            <div className="card p-4 space-y-4 lg:col-span-1 h-60 lg:h-[calc(100vh-220px)] flex flex-col">
               <div>
                 <h3 className="font-semibold text-gray-900 text-sm">Employees</h3>
                 <p className="text-xs text-gray-400 mt-0.5">Select to view logs</p>
@@ -213,9 +213,9 @@ export default function AttendancePage() {
           )}
 
           {/* Details Panel (Stats, Calendar, and Table) */}
-          <div className={`${isManager ? "lg:col-span-3" : ""} space-y-6 overflow-y-auto h-[calc(100vh-220px)] pr-2`}>
+          <div className={`${isManager ? "lg:col-span-3" : ""} space-y-6 overflow-y-auto h-auto lg:h-[calc(100vh-220px)] pr-2`}>
             {/* Stats */}
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div className="kpi-card"><p className="text-xs text-gray-500">Present (Full)</p><p className="text-xl font-bold text-emerald-600">{presentCount}</p></div>
               <div className="kpi-card"><p className="text-xs text-gray-500">Half Day</p><p className="text-xl font-bold text-amber-600">{halfDayCount}</p></div>
               <div className="kpi-card"><p className="text-xs text-gray-500 font-medium text-red-600">Late Days</p><p className="text-xl font-bold text-red-600">{lateCount}</p></div>
