@@ -97,7 +97,7 @@ export default function FanpageWorkPage() {
     const data = await res.json();
     setLoading(false);
     
-    const monthRecords = data.fanpageWork || [];
+    const monthRecords: FanpageWorkRecord[] = data.fanpageWork || [];
     if (monthRecords.length === 0) {
       alert("No logs to export for this month");
       return;
