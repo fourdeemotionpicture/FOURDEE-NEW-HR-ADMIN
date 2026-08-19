@@ -29,7 +29,7 @@ function onOpen() {
 function syncSheetToPortal() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
   const range = sheet.getDataRange();
-  const values = range.getValues();
+  const values = range.getDisplayValues();
   
   if (values.length <= 1) {
     SpreadsheetApp.getUi().alert("Sheet is empty!");
@@ -44,20 +44,16 @@ function syncSheetToPortal() {
   for (let i = 1; i < values.length; i++) {
     const row = values[i];
     
-    let rawDate = row[0];
-    let rawCategory = row[1];
-    let rawDesc = row[2];
-    let rawAmount = row[3];
-    let rawOpening = row[4];
-    let rawBillUrl = row[8] || ""; // Column I (9th column) for Bill URLs
+    let rawDate = row[0] ? String(row[0]).trim() : "";
+    let rawCategory = row[1] ? String(row[1]).trim() : "";
+    let rawDesc = row[2] ? String(row[2]).trim() : "";
+    let rawAmount = row[3] ? String(row[3]).trim() : "";
+    let rawOpening = row[4] ? String(row[4]).trim() : "";
+    let rawBillUrl = row[8] ? String(row[8]).trim() : ""; // Column I (9th column) for Bill URLs
 
-    // Format Date object to YYYY-MM-DD
+    // Parse DD/MM/YYYY display string manually to YYYY-MM-DD
     let dateStr = "";
-    if (rawDate instanceof Date) {
-      dateStr = Utilities.formatDate(rawDate, Session.getScriptTimeZone(), "yyyy-MM-dd");
-      lastDateStr = dateStr;
-    } else if (typeof rawDate === "string" && rawDate.trim() !== "") {
-      // Parse DD/MM/YYYY string manually
+    if (rawDate !== "") {
       const parts = rawDate.split("/");
       if (parts.length === 3) {
         dateStr = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
