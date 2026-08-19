@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { expenses, pettyCash, users } from "@/db/schema";
 import { eq, gte, lte, desc, sql, and } from "drizzle-orm";
 import { format, startOfMonth, endOfMonth, startOfDay, endOfDay, parse } from "date-fns";
+import { syncToGoogleSheet } from "@/lib/googleSheets";
 
 export async function GET(request: NextRequest) {
   try {
@@ -106,6 +107,15 @@ export async function POST(request: NextRequest) {
         createdBy: currentUser.userId,
       }).returning();
 
+      // Sync to Google Sheet
+      syncToGoogleSheet("add", {
+        type: "petty_cash",
+        date,
+        amount: parseFloat(amount),
+        category: "add petty cash",
+        notes: notes || ""
+      });
+
       return NextResponse.json({ pettyCash: record });
     }
 
@@ -140,6 +150,16 @@ export async function POST(request: NextRequest) {
       createdBy: currentUser.userId,
     }).returning();
 
+    // Sync to Google Sheet
+    syncToGoogleSheet("add", {
+      type: "expense",
+      date,
+      paidTo,
+      amount: parseFloat(amount),
+      notes: notes || "",
+      billUrl: billUrl || ""
+    });
+
     return NextResponse.json({ expense: record });
   } catch (error) {
     console.error("Expenses POST error:", error);
@@ -168,6 +188,15 @@ export async function DELETE(request: NextRequest) {
       });
 
       if (pc) {
+        // Trigger sheet sync
+        syncToGoogleSheet("delete", {
+          type: pc.type === "received" ? "petty_cash" : "expense",
+          date: pc.date,
+          amount: Math.abs(parseFloat(pc.amount)),
+          category: pc.type === "received" ? "add petty cash" : (pc.notes?.replace("Expense: ", "") || "Other"),
+          notes: pc.notes || ""
+        });
+
         // If this petty cash was created as part of an expense, delete the matching expense too
         if (pc.type === "expense") {
           const matchExp = await db.query.expenses.findFirst({
@@ -200,6 +229,15 @@ export async function DELETE(request: NextRequest) {
       });
 
       if (exp) {
+        // Trigger sheet sync
+        syncToGoogleSheet("delete", {
+          type: "expense",
+          date: exp.date,
+          amount: parseFloat(exp.amount),
+          category: exp.paidTo,
+          notes: exp.notes || ""
+        });
+
         // Find corresponding petty cash entry
         const matchPC = await db.query.pettyCash.findFirst({
           where: and(
