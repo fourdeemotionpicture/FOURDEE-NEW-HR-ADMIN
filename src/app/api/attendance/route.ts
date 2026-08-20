@@ -100,16 +100,24 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { userId, date, inTime, outTime, source, notes } = body;
+    const { userId, date, inTime, outTime, source, notes, status } = body;
 
-    if (!date || !inTime || !outTime) {
-      return NextResponse.json({ error: "Date, in time, and out time are required" }, { status: 400 });
+    if (!date) {
+      return NextResponse.json({ error: "Date is required" }, { status: 400 });
     }
 
     const today = format(new Date(), "yyyy-MM-dd");
     const canOverride = currentUser.role === "super_admin" || currentUser.role === "owner_admin";
 
-    // Validation rules for manual attendance
+    // Determine if setting a leave or week off status
+    const leaveStatuses = ["WO", "CL", "SL", "CO", "LOP", "H", "absent"];
+    const isLeaveStatus = status && leaveStatuses.includes(status);
+
+    if (!isLeaveStatus && (!inTime || !outTime)) {
+      return NextResponse.json({ error: "Date, in time, and out time are required for present/half day status" }, { status: 400 });
+    }
+
+    // Validation rules for manual attendance (non-admin)
     if (source === "manual" && !canOverride) {
       // Cannot submit for future dates
       if (date > today) {
@@ -128,9 +136,23 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const cleanInTime = inTime.slice(0, 5);
-    const cleanOutTime = outTime.slice(0, 5);
-    const calculations = calculateAttendance(cleanInTime, cleanOutTime);
+    let cleanInTime = null;
+    let cleanOutTime = null;
+    let workingHours = "0.00";
+    let lateMinutes = 0;
+    let overtimeMinutes = 0;
+    let finalStatus = status || "present";
+
+    if (!isLeaveStatus) {
+      cleanInTime = inTime.slice(0, 5);
+      cleanOutTime = outTime.slice(0, 5);
+      const calculations = calculateAttendance(cleanInTime, cleanOutTime);
+      workingHours = calculations.workingHours;
+      lateMinutes = calculations.lateMinutes;
+      overtimeMinutes = calculations.overtimeMinutes;
+      finalStatus = status || calculations.status;
+    }
+
     const targetUserId = canOverride && userId ? userId : currentUser.userId;
 
     // Check if attendance already exists
@@ -143,10 +165,10 @@ export async function POST(request: NextRequest) {
       const [updated] = await db.update(attendance).set({
         inTime: cleanInTime,
         outTime: cleanOutTime,
-        workingHours: calculations.workingHours,
-        lateMinutes: calculations.lateMinutes,
-        overtimeMinutes: calculations.overtimeMinutes,
-        status: calculations.status,
+        workingHours: workingHours,
+        lateMinutes: lateMinutes,
+        overtimeMinutes: overtimeMinutes,
+        status: finalStatus,
         source: source || "manual",
         notes: notes || null,
         updatedAt: new Date(),
@@ -159,7 +181,7 @@ export async function POST(request: NextRequest) {
           action: "attendance_override",
           entity: "attendance",
           entityId: updated.id,
-          details: { targetUserId, date, inTime: cleanInTime, outTime: cleanOutTime },
+          details: { targetUserId, date, inTime: cleanInTime, outTime: cleanOutTime, status: finalStatus },
         });
       }
 
@@ -172,10 +194,10 @@ export async function POST(request: NextRequest) {
       date,
       inTime: cleanInTime,
       outTime: cleanOutTime,
-      workingHours: calculations.workingHours,
-      lateMinutes: calculations.lateMinutes,
-      overtimeMinutes: calculations.overtimeMinutes,
-      status: calculations.status,
+      workingHours: workingHours,
+      lateMinutes: lateMinutes,
+      overtimeMinutes: overtimeMinutes,
+      status: finalStatus,
       source: source || "manual",
       notes: notes || null,
     }).returning();

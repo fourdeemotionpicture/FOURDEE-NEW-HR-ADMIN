@@ -2,20 +2,48 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Clock, Plus, Calendar, ChevronLeft, ChevronRight, X, Search } from "lucide-react";
+import { Clock, Plus, Calendar, ChevronLeft, ChevronRight, X, Search, Check, AlertCircle } from "lucide-react";
 import AppShell from "@/components/AppShell";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, parse } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths } from "date-fns";
 
 interface AttendanceRecord {
-  id: string; userId: string; date: string; inTime: string | null; outTime: string | null;
-  status: string; source: string; lateMinutes: number | null; workingHours: string | null; overtimeMinutes: number | null; userName?: string; notes?: string | null;
+  id: string;
+  userId: string;
+  date: string;
+  inTime: string | null;
+  outTime: string | null;
+  status: string;
+  source: string;
+  lateMinutes: number | null;
+  workingHours: string | null;
+  overtimeMinutes: number | null;
+  userName?: string;
+  notes?: string | null;
+}
+
+interface LeaveRequest {
+  id: string;
+  userId: string;
+  userName?: string;
+  startDate: string;
+  endDate: string;
+  type: string;
+  reason: string | null;
+  status: string;
+  createdAt: string;
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  present: "bg-emerald-100 text-emerald-700",
-  absent: "bg-red-100 text-red-700",
-  half_day: "bg-amber-100 text-amber-700",
-  holiday: "bg-blue-100 text-blue-700",
+  present: "bg-emerald-50 text-emerald-700 border-emerald-100",
+  absent: "bg-red-50 text-red-700 border-red-100",
+  half_day: "bg-amber-50 text-amber-700 border-amber-100",
+  holiday: "bg-blue-50 text-blue-700 border-blue-100",
+  WO: "bg-gray-50 text-gray-600 border-gray-100",
+  CL: "bg-purple-50 text-purple-700 border-purple-100",
+  SL: "bg-pink-50 text-pink-700 border-pink-100",
+  CO: "bg-indigo-50 text-indigo-700 border-indigo-100",
+  LOP: "bg-orange-50 text-orange-700 border-orange-100",
+  H: "bg-sky-50 text-sky-700 border-sky-100",
 };
 
 export default function AttendancePage() {
@@ -23,12 +51,18 @@ export default function AttendancePage() {
   const [loading, setLoading] = useState(true);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [showModal, setShowModal] = useState(false);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  
   const [userRole, setUserRole] = useState("employee");
   const [currentUser, setCurrentUser] = useState<{ id: string; name: string } | null>(null);
   const [employees, setEmployees] = useState<{ id: string; name: string }[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("");
   const [search, setSearch] = useState("");
-  const [form, setForm] = useState({ userId: "", date: "", inTime: "", outTime: "", notes: "" });
+  
+  const [form, setForm] = useState({ userId: "", date: "", inTime: "", outTime: "", notes: "", status: "present" });
+  const [leaveForm, setLeaveForm] = useState({ startDate: "", endDate: "", type: "CL", reason: "" });
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
+  const [clBalance, setClBalance] = useState({ accrued: 0, used: 0, available: 0 });
 
   const monthStr = format(currentMonth, "yyyy-MM");
   const isManager = userRole === "super_admin" || userRole === "owner_admin";
@@ -36,9 +70,18 @@ export default function AttendancePage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     const targetUserId = selectedEmployeeId || "";
-    const res = await fetch(`/api/attendance?month=${monthStr}&userId=${targetUserId}`);
-    const data = await res.json();
-    setRecords(data.attendance || []);
+    
+    // Fetch attendance
+    const attendanceRes = await fetch(`/api/attendance?month=${monthStr}&userId=${targetUserId}`);
+    const attendanceData = await attendanceRes.json();
+    setRecords(attendanceData.attendance || []);
+    
+    // Fetch leave requests
+    const leaveRes = await fetch(`/api/leave-requests?userId=${targetUserId}`);
+    const leaveData = await leaveRes.json();
+    setLeaveRequests(leaveData.requests || []);
+    setClBalance(leaveData.clBalance || { accrued: 0, used: 0, available: 0 });
+
     setLoading(false);
   }, [monthStr, selectedEmployeeId]);
 
@@ -70,10 +113,21 @@ export default function AttendancePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const body: Record<string, string> = { date: form.date, inTime: form.inTime, outTime: form.outTime, source: "manual" };
+    const body: Record<string, any> = { 
+      date: form.date, 
+      source: "manual", 
+      status: form.status 
+    };
+
+    // Only set time parameters if not setting a leave/weekoff status
+    const isLeave = ["WO", "CL", "SL", "CO", "LOP", "H", "absent"].includes(form.status);
+    if (!isLeave) {
+      body.inTime = form.inTime;
+      body.outTime = form.outTime;
+    }
+
     if (form.notes) body.notes = form.notes;
     
-    // Use target employee from selected list or dropdown
     const targetId = form.userId || selectedEmployeeId || currentUser?.id;
     if (targetId) body.userId = targetId;
 
@@ -89,17 +143,58 @@ export default function AttendancePage() {
         return;
       }
       setShowModal(false);
-      setForm({ userId: "", date: "", inTime: "", outTime: "", notes: "" });
+      setForm({ userId: "", date: "", inTime: "", outTime: "", notes: "", status: "present" });
       fetchData();
     } catch {
       alert("Network error. Please try again.");
     }
   };
 
+  const handleLeaveSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch("/api/leave-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(leaveForm),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "Failed to submit leave request");
+        return;
+      }
+      setShowLeaveModal(false);
+      setLeaveForm({ startDate: "", endDate: "", type: "CL", reason: "" });
+      fetchData();
+    } catch {
+      alert("Network error. Please try again.");
+    }
+  };
+
+  const handleReviewLeave = async (requestId: string, status: "approved" | "rejected") => {
+    if (!confirm(`Are you sure you want to ${status} this request?`)) return;
+
+    try {
+      const res = await fetch("/api/leave-requests", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestId, status }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "Action failed");
+        return;
+      }
+      fetchData();
+    } catch {
+      alert("Network error.");
+    }
+  };
+
   const handleDayClick = (day: Date) => {
     const dateStr = format(day, "yyyy-MM-dd");
     if (!isManager && dateStr !== today) {
-      return; // Employees and office admins can only clock in/out for today
+      return; // Employees can only submit for today
     }
     
     const record = getRecordForDate(dateStr);
@@ -109,6 +204,7 @@ export default function AttendancePage() {
       inTime: record?.inTime || "10:00",
       outTime: record?.outTime || "18:00",
       notes: record?.notes || "",
+      status: record?.status || (getDay(day) === 0 ? "WO" : "present"),
     });
     setShowModal(true);
   };
@@ -131,37 +227,57 @@ export default function AttendancePage() {
     emp.name.toLowerCase().includes(search.toLowerCase()) && emp.id !== currentUser?.id
   );
 
+  const pendingLeaves = leaveRequests.filter((l) => l.status === "pending");
+  const historicalLeaves = leaveRequests.filter((l) => l.status !== "pending");
+
   return (
     <AppShell>
       <div className="space-y-6">
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Attendance</h1>
-            <p className="text-sm text-gray-500 mt-0.5">Track and manage attendance records</p>
+            <p className="text-sm text-gray-500 mt-0.5">Track and manage attendance & leaves</p>
           </div>
-          {userRole !== "owner_admin" && (
+          <div className="flex gap-2">
             <button 
               onClick={() => { 
-                setShowModal(true); 
-                setForm({ 
-                  userId: selectedEmployeeId || currentUser?.id || "", 
-                  date: today, 
-                  inTime: "10:00", 
-                  outTime: "18:00", 
-                  notes: "" 
+                setShowLeaveModal(true); 
+                setLeaveForm({ 
+                  startDate: today, 
+                  endDate: today, 
+                  type: "CL", 
+                  reason: "" 
                 }); 
               }} 
-              className="btn-primary"
+              className="btn-secondary"
             >
-              <Plus className="w-4.5 h-4.5" /> Mark Attendance
+              Apply Leave
             </button>
-          )}
+            {userRole !== "owner_admin" && (
+              <button 
+                onClick={() => { 
+                  setShowModal(true); 
+                  setForm({ 
+                    userId: selectedEmployeeId || currentUser?.id || "", 
+                    date: today, 
+                    inTime: "10:00", 
+                    outTime: "18:00", 
+                    notes: "",
+                    status: "present"
+                  }); 
+                }} 
+                className="btn-primary"
+              >
+                <Plus className="w-4.5 h-4.5" /> Mark Attendance
+              </button>
+            )}
+          </div>
         </motion.div>
 
         {/* Master-Detail Layout Container */}
         <div className={`grid ${isManager ? "grid-cols-1 lg:grid-cols-4 gap-6" : "grid-cols-1"}`}>
           
-          {/* Master Sidebar (For Super Admin and Owner Admin) */}
+          {/* Master Sidebar (For Admins) */}
           {isManager && (
             <div className="card p-4 space-y-4 lg:col-span-1 h-60 lg:h-[calc(100vh-220px)] flex flex-col">
               <div>
@@ -179,7 +295,6 @@ export default function AttendancePage() {
                 <Search className="w-4.5 h-4.5 text-gray-400 absolute left-3 top-3.5" />
               </div>
               <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
-                {/* Self Option */}
                 <button
                   onClick={() => setSelectedEmployeeId(currentUser?.id || "")}
                   className={`w-full text-left px-3 py-2.5 rounded-xl transition-all flex items-center justify-between ${
@@ -191,7 +306,6 @@ export default function AttendancePage() {
                   <span className="text-sm">Self ({currentUser?.name || "Admin"})</span>
                 </button>
                 
-                {/* Employee List */}
                 {filteredEmployees.map((emp) => (
                   <button
                     key={emp.id}
@@ -205,21 +319,23 @@ export default function AttendancePage() {
                     <span className="text-sm truncate">{emp.name}</span>
                   </button>
                 ))}
-                {filteredEmployees.length === 0 && (
-                  <p className="text-xs text-gray-400 text-center py-4">No employees found</p>
-                )}
               </div>
             </div>
           )}
 
-          {/* Details Panel (Stats, Calendar, and Table) */}
+          {/* Details Panel */}
           <div className={`${isManager ? "lg:col-span-3" : ""} space-y-6 overflow-y-auto h-auto lg:h-[calc(100vh-220px)] pr-2`}>
-            {/* Stats */}
+            
+            {/* Quota Summary & Stats */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="kpi-card"><p className="text-xs text-gray-500">Present (Full)</p><p className="text-xl font-bold text-emerald-600">{presentCount}</p></div>
-              <div className="kpi-card"><p className="text-xs text-gray-500">Half Day</p><p className="text-xl font-bold text-amber-600">{halfDayCount}</p></div>
-              <div className="kpi-card"><p className="text-xs text-gray-500 font-medium text-red-600">Late Days</p><p className="text-xl font-bold text-red-600">{lateCount}</p></div>
-              <div className="kpi-card"><p className="text-xs text-gray-500">Total Hours</p><p className="text-xl font-bold text-gray-900">{totalHours.toFixed(1)}</p></div>
+              <div className="kpi-card bg-purple-50/20 border-purple-100/50">
+                <p className="text-xs text-purple-600 font-medium">Casual Leave Quota</p>
+                <p className="text-xl font-bold text-purple-700 mt-1">{clBalance.available} CL left</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">Accrued: {clBalance.accrued} | Used: {clBalance.used}</p>
+              </div>
+              <div className="kpi-card"><p className="text-xs text-gray-500">Present (Full)</p><p className="text-xl font-bold text-emerald-600 mt-1">{presentCount}</p></div>
+              <div className="kpi-card"><p className="text-xs text-gray-500 font-medium text-red-600">Late Days</p><p className="text-xl font-bold text-red-600 mt-1">{lateCount}</p></div>
+              <div className="kpi-card"><p className="text-xs text-gray-500">Total Hours</p><p className="text-xl font-bold text-gray-900 mt-1">{totalHours.toFixed(1)}</p></div>
             </div>
 
             {/* Month Navigator */}
@@ -244,6 +360,7 @@ export default function AttendancePage() {
                   const dateStr = format(day, "yyyy-MM-dd");
                   const record = getRecordForDate(dateStr);
                   const isToday = dateStr === today;
+                  const isSunday = getDay(day) === 0;
 
                   return (
                     <motion.div
@@ -253,17 +370,23 @@ export default function AttendancePage() {
                       onClick={() => handleDayClick(day)}
                       className={`p-2 rounded-xl border transition-all cursor-pointer hover:border-blue-200 min-h-[70px]
                         ${isToday ? "border-blue-300 bg-blue-50/50" : "border-transparent"}
-                        ${record ? "bg-gray-50" : "hover:bg-gray-50/50"}`}
+                        ${record ? "bg-gray-50" : isSunday ? "bg-gray-50/30 text-gray-400" : "hover:bg-gray-50/50"}`}
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <span className={`text-xs font-medium ${isToday ? "text-blue-600" : "text-gray-700"}`}>{format(day, "d")}</span>
-                        {record && <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${STATUS_COLORS[record.status] || "badge-neutral"}`}>{record.status.replace("_", " ")}</span>}
+                        <span className={`text-xs font-medium ${isToday ? "text-blue-600 font-bold" : isSunday ? "text-gray-400" : "text-gray-700"}`}>{format(day, "d")}</span>
+                        {record ? (
+                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${STATUS_COLORS[record.status] || "bg-gray-100 text-gray-700"}`}>
+                            {record.status.toUpperCase()}
+                          </span>
+                        ) : isSunday ? (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full border bg-gray-50 text-gray-400 border-gray-100">WO</span>
+                        ) : null}
                       </div>
                       {record && (
                         <div className="space-y-0.5">
                           {record.inTime && <p className="text-[10px] text-gray-500">In: {record.inTime}</p>}
                           {record.outTime && <p className="text-[10px] text-gray-500">Out: {record.outTime}</p>}
-                          {record.workingHours && <p className="text-[10px] text-gray-500 font-medium">{record.workingHours}h</p>}
+                          {record.workingHours && parseFloat(record.workingHours) > 0 && <p className="text-[10px] text-gray-500 font-medium">{record.workingHours}h</p>}
                           {(record.lateMinutes ?? 0) > 0 && <p className="text-[10px] text-red-500 font-semibold">{record.lateMinutes}m late</p>}
                         </div>
                       )}
@@ -273,55 +396,83 @@ export default function AttendancePage() {
               </div>
             </div>
 
-            {/* Attendance Table */}
+            {/* Leave Approvals Queue (Manager only) */}
+            {isManager && pendingLeaves.length > 0 && (
+              <div className="card p-5 border-l-4 border-amber-500">
+                <div className="flex items-center gap-2 mb-4">
+                  <AlertCircle className="w-5 h-5 text-amber-500" />
+                  <h3 className="font-semibold text-gray-900 text-sm">Pending Leave Requests</h3>
+                </div>
+                <div className="space-y-3">
+                  {pendingLeaves.map((leave) => (
+                    <div key={leave.id} className="p-4 bg-gray-50 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-gray-100">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">{leave.userName || "Employee"}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          Requested <span className="font-semibold text-purple-600">{leave.type}</span> from <span className="font-medium">{leave.startDate}</span> to <span className="font-medium">{leave.endDate}</span>
+                        </p>
+                        {leave.reason && <p className="text-xs italic text-gray-500 mt-1 bg-white p-2 rounded border border-gray-100">"${leave.reason}"</p>}
+                      </div>
+                      <div className="flex gap-2 self-end sm:self-center">
+                        <button onClick={() => handleReviewLeave(leave.id, "approved")} className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 flex items-center gap-1">
+                          <Check className="w-3.5 h-3.5" /> Approve
+                        </button>
+                        <button onClick={() => handleReviewLeave(leave.id, "rejected")} className="px-3 py-1.5 bg-red-50 text-red-600 border border-red-100 rounded-lg text-xs font-semibold hover:bg-red-100">
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Attendance & Leave Logs Combined Table */}
             <div className="card overflow-hidden">
               <div className="px-5 py-3 border-b border-gray-100">
-                <h3 className="text-sm font-semibold text-gray-900">Attendance Records</h3>
+                <h3 className="text-sm font-semibold text-gray-900">Leave Application History</h3>
               </div>
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-gray-100">
-                    <th className="text-left text-xs font-semibold text-gray-500 uppercase px-5 py-2.5">Date</th>
-                    <th className="text-left text-xs font-semibold text-gray-500 uppercase px-5 py-2.5">In Time</th>
-                    <th className="text-left text-xs font-semibold text-gray-500 uppercase px-5 py-2.5">Out Time</th>
-                    <th className="text-left text-xs font-semibold text-gray-500 uppercase px-5 py-2.5">Hours</th>
-                    <th className="text-left text-xs font-semibold text-gray-500 uppercase px-5 py-2.5">Late</th>
-                    <th className="text-left text-xs font-semibold text-gray-500 uppercase px-5 py-2.5">OT</th>
+                  <tr className="border-b border-gray-100 bg-gray-50/50">
+                    <th className="text-left text-xs font-semibold text-gray-500 uppercase px-5 py-2.5">Leave Type</th>
+                    <th className="text-left text-xs font-semibold text-gray-500 uppercase px-5 py-2.5">Start Date</th>
+                    <th className="text-left text-xs font-semibold text-gray-500 uppercase px-5 py-2.5">End Date</th>
+                    <th className="text-left text-xs font-semibold text-gray-500 uppercase px-5 py-2.5">Reason</th>
                     <th className="text-left text-xs font-semibold text-gray-500 uppercase px-5 py-2.5">Status</th>
-                    <th className="text-left text-xs font-semibold text-gray-500 uppercase px-5 py-2.5">Source</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {loading ? (
-                    <tr><td colSpan={8} className="text-center py-8 text-gray-400">Loading...</td></tr>
-                  ) : records.length === 0 ? (
-                    <tr><td colSpan={8} className="text-center py-8 text-gray-400">No records found</td></tr>
-                  ) : records.sort((a, b) => b.date.localeCompare(a.date)).map((r) => (
-                    <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                      <td className="px-5 py-2.5 text-sm text-gray-900">{r.date}</td>
-                      <td className="px-5 py-2.5 text-sm text-gray-600">{r.inTime || "-"}</td>
-                      <td className="px-5 py-2.5 text-sm text-gray-600">{r.outTime || "-"}</td>
-                      <td className="px-5 py-2.5 text-sm text-gray-600">{r.workingHours || "-"}</td>
-                      <td className="px-5 py-2.5 text-sm text-red-500">{(r.lateMinutes ?? 0) > 0 ? `${r.lateMinutes}m` : "-"}</td>
-                      <td className="px-5 py-2.5 text-sm text-gray-600">{(r.overtimeMinutes ?? 0) > 0 ? `${r.overtimeMinutes}m` : "-"}</td>
-                      <td className="px-5 py-2.5"><span className={`badge ${STATUS_COLORS[r.status] || "badge-neutral"}`}>{r.status.replace("_", " ")}</span></td>
-                      <td className="px-5 py-2.5"><span className="badge badge-neutral">{r.source}</span></td>
+                  {historicalLeaves.length === 0 ? (
+                    <tr><td colSpan={5} className="text-center py-6 text-xs text-gray-400">No leave history</td></tr>
+                  ) : historicalLeaves.map((l) => (
+                    <tr key={l.id} className="border-b border-gray-50 hover:bg-gray-50/50 text-sm">
+                      <td className="px-5 py-3.5 font-medium text-purple-600">{l.type}</td>
+                      <td className="px-5 py-3.5 text-gray-600">{l.startDate}</td>
+                      <td className="px-5 py-3.5 text-gray-600">{l.endDate}</td>
+                      <td className="px-5 py-3.5 text-gray-500 max-w-xs truncate">{l.reason || "-"}</td>
+                      <td className="px-5 py-3.5">
+                        <span className={`px-2 py-1 rounded-lg text-xs font-semibold uppercase ${
+                          l.status === "approved" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"
+                        }`}>{l.status}</span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+
           </div>
         </div>
       </div>
 
-      {/* Attendance Modal */}
+      {/* Attendance Manual Mark Modal */}
       <AnimatePresence>
         {showModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowModal(false)}>
             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="card p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-5">
-                <h2 className="text-lg font-semibold text-gray-900">Mark Attendance</h2>
+                <h2 className="text-lg font-semibold text-gray-900">Mark Attendance / Override</h2>
                 <button onClick={() => setShowModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100"><X className="w-4.5 h-4.5 text-gray-500" /></button>
               </div>
               <form onSubmit={handleSubmit} className="space-y-3.5">
@@ -342,22 +493,86 @@ export default function AttendancePage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
                   <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className="input-field" required />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">In Time</label>
-                    <input type="time" value={form.inTime} onChange={(e) => setForm({ ...form, inTime: e.target.value })} className="input-field" required />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Out Time</label>
-                    <input type="time" value={form.outTime} onChange={(e) => setForm({ ...form, outTime: e.target.value })} className="input-field" required />
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select 
+                    value={form.status} 
+                    onChange={(e) => setForm({ ...form, status: e.target.value })} 
+                    className="input-field font-semibold text-blue-600"
+                  >
+                    <option value="present">Present (Full Day)</option>
+                    <option value="half_day">Half Day</option>
+                    <option value="absent">Absent</option>
+                    <option value="WO">Week Off (WO)</option>
+                    <option value="CL">Casual Leave (CL)</option>
+                    <option value="SL">Sick Leave (SL)</option>
+                    <option value="CO">Comp Off (CO)</option>
+                    <option value="LOP">Loss of Pay (LOP)</option>
+                    <option value="H">Holiday (H)</option>
+                  </select>
                 </div>
+                {!["WO", "CL", "SL", "CO", "LOP", "H", "absent"].includes(form.status) && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">In Time</label>
+                      <input type="time" value={form.inTime} onChange={(e) => setForm({ ...form, inTime: e.target.value })} className="input-field" required />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Out Time</label>
+                      <input type="time" value={form.outTime} onChange={(e) => setForm({ ...form, outTime: e.target.value })} className="input-field" required />
+                    </div>
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
                   <input type="text" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="input-field" />
                 </div>
-                <p className="text-xs text-gray-400">Shift hours: 10:00 AM - 6:00 PM | Grace: 10:15 AM</p>
-                <button type="submit" className="btn-primary w-full justify-center">Submit Attendance</button>
+                <button type="submit" className="btn-primary w-full justify-center">Save Status</button>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Leave Application Modal */}
+      <AnimatePresence>
+        {showLeaveModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowLeaveModal(false)}>
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="card p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-lg font-semibold text-gray-900">Apply for Leave</h2>
+                <button onClick={() => setShowLeaveModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100"><X className="w-4.5 h-4.5 text-gray-500" /></button>
+              </div>
+              <form onSubmit={handleLeaveSubmit} className="space-y-3.5">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Leave Type</label>
+                  <select 
+                    value={leaveForm.type} 
+                    onChange={(e) => setLeaveForm({ ...leaveForm, type: e.target.value })} 
+                    className="input-field"
+                  >
+                    <option value="CL">Casual Leave (CL) - Roll-over</option>
+                    <option value="SL">Sick Leave (SL)</option>
+                    <option value="CO">Comp Off (CO)</option>
+                    <option value="H">Holiday (H) Request</option>
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                    <input type="date" value={leaveForm.startDate} onChange={(e) => setLeaveForm({ ...leaveForm, startDate: e.target.value })} className="input-field" required />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                    <input type="date" value={leaveForm.endDate} onChange={(e) => setLeaveForm({ ...leaveForm, endDate: e.target.value })} className="input-field" required />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Reason for Leave</label>
+                  <textarea value={leaveForm.reason} onChange={(e) => setLeaveForm({ ...leaveForm, reason: e.target.value })} className="input-field min-h-[80px]" required placeholder="State your reason..." />
+                </div>
+                <p className="text-xs text-gray-400">Note: Leave requests (except CL within quota) will be sent to the Super Admin for approval. You will receive an email once approved or rejected.</p>
+                <button type="submit" className="btn-primary w-full justify-center">Submit Request</button>
               </form>
             </motion.div>
           </motion.div>

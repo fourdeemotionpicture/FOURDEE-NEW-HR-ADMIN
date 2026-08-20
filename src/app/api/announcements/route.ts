@@ -50,6 +50,8 @@ export async function GET() {
   }
 }
 
+import { sendEmail } from "@/lib/email";
+
 export async function POST(request: NextRequest) {
   try {
     const currentUser = await getCurrentUser();
@@ -72,6 +74,28 @@ export async function POST(request: NextRequest) {
       attachmentUrl: attachmentUrl || null,
       createdBy: currentUser.userId,
     }).returning();
+
+    // Send email to all active employees
+    try {
+      const activeUsers = await db.select({ email: users.email }).from(users).where(eq(users.isActive, true));
+      const recipientEmails = activeUsers.map((u) => u.email).filter(Boolean);
+
+      if (recipientEmails.length > 0) {
+        await sendEmail({
+          to: recipientEmails.join(","),
+          subject: `📢 Announcement: ${title}`,
+          html: `<h3>📢 New Announcement: ${title}</h3>
+                 <p>Dear Team,</p>
+                 <p>${description}</p>
+                 ${attachmentUrl ? `<p><b>Attachment:</b> <a href="${attachmentUrl}">View Attachment</a></p>` : ""}
+                 <br/>
+                 <p>Best Regards,</p>
+                 <p><b>Four Dee Motion Picture ERP Team</b></p>`,
+        });
+      }
+    } catch (emailErr) {
+      console.error("Announcement email distribution failed:", emailErr);
+    }
 
     return NextResponse.json({ announcement: record });
   } catch (error) {

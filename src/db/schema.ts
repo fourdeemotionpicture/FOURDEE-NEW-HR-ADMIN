@@ -121,3 +121,17 @@ export const fanpageWork = pgTable("fanpage_work", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+// ─── Leave Requests ──────────────────────────────────────────────────────────
+export const leaveRequests = pgTable("leave_requests", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date").notNull(),
+  type: varchar("type", { length: 50 }).notNull(), // CL, SL, CO, H
+  reason: text("reason"),
+  status: varchar("status", { length: 50 }).notNull().default("pending"), // pending, approved, rejected
+  reviewedBy: uuid("reviewed_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+

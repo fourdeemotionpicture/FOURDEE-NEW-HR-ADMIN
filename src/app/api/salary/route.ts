@@ -3,7 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/db";
 import { users, attendance } from "@/db/schema";
 import { eq, and, gte, lte } from "drizzle-orm";
-import { format, startOfMonth, endOfMonth, parse, getDaysInMonth } from "date-fns";
+import { format, startOfMonth, endOfMonth, parse, getDaysInMonth, eachDayOfInterval, getDay } from "date-fns";
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,11 +20,13 @@ export async function GET(request: NextRequest) {
     const startDate = format(startOfMonth(monthDate), "yyyy-MM-dd");
     const endDate = format(endOfMonth(monthDate), "yyyy-MM-dd");
     const totalDaysInMonth = getDaysInMonth(monthDate);
+    const calendarDays = eachDayOfInterval({ start: startOfMonth(monthDate), end: endOfMonth(monthDate) });
 
     // Get employees
     let allUsers = await db.select({
       id: users.id,
       name: users.name,
+      email: users.email,
       role: users.role,
       designation: users.designation,
       monthlySalary: users.monthlySalary,
@@ -49,37 +51,110 @@ export async function GET(request: NextRequest) {
       const hourlySalary = dailySalary / 8;
       const perMinuteSalary = hourlySalary / 60;
 
-      let presentDays = userAttendance.filter((a) => a.status === "present" || a.status === "half_day").length;
+      let presentCount = 0;
+      let halfDayCount = 0;
+      let woCount = 0;
+      let clCount = 0;
+      let slCount = 0;
+      let coCount = 0;
+      let holidayCount = 0;
+      let lopCount = 0;
+      let absentCount = 0;
+
+      let paidDays = 0.0;
+      let deductedDays = 0.0;
+
+      // Analyze day-by-day
+      for (const day of calendarDays) {
+        const dateStr = format(day, "yyyy-MM-dd");
+        const record = userAttendance.find((a) => a.date === dateStr);
+
+        if (record) {
+          const status = record.status;
+          if (status === "present") {
+            presentCount++;
+            paidDays += 1.0;
+          } else if (status === "half_day") {
+            halfDayCount++;
+            paidDays += 0.5;
+            deductedDays += 0.5;
+          } else if (status === "WO") {
+            woCount++;
+            paidDays += 1.0;
+          } else if (status === "CL") {
+            clCount++;
+            paidDays += 1.0;
+          } else if (status === "SL") {
+            slCount++;
+            paidDays += 1.0;
+          } else if (status === "CO") {
+            coCount++;
+            paidDays += 1.0;
+          } else if (status === "H") {
+            holidayCount++;
+            paidDays += 1.0;
+          } else if (status === "LOP") {
+            lopCount++;
+            deductedDays += 1.0;
+          } else if (status === "absent") {
+            absentCount++;
+            deductedDays += 1.0;
+          }
+        } else {
+          // No record in DB
+          if (getDay(day) === 0) {
+            // Sunday is automatically Week Off
+            woCount++;
+            paidDays += 1.0;
+          } else {
+            // Weekday with no record is absent
+            absentCount++;
+            deductedDays += 1.0;
+          }
+        }
+      }
+
       let lateDays = userAttendance.filter((a) => (a.lateMinutes ?? 0) > 0).length;
       const totalWorkingHours = userAttendance.reduce((acc, a) => acc + parseFloat(a.workingHours ?? "0"), 0);
       const totalOvertime = userAttendance.reduce((acc, a) => acc + (a.overtimeMinutes ?? 0), 0);
-      let absentDays = totalDaysInMonth - presentDays;
 
-      // Calculate earned salary and deductions
-      let earnedSalary = presentDays * dailySalary;
-      let deductions = absentDays * dailySalary;
+      // Deductions calculation
+      let earnedSalary = paidDays * dailySalary;
+      let deductions = deductedDays * dailySalary;
       let finalPayable = Math.max(0, monthlySalary - deductions);
 
-      // If user does not track attendance (super_admin, owner_admin)
+      // If user is Super Admin or Owner Admin, they get full salary always
       if (user.role !== "employee" && user.role !== "office_admin") {
-        presentDays = totalDaysInMonth;
-        absentDays = 0;
+        presentCount = totalDaysInMonth;
+        absentCount = 0;
         deductions = 0;
         earnedSalary = monthlySalary;
         finalPayable = monthlySalary;
+        paidDays = totalDaysInMonth;
+        deductedDays = 0;
       }
 
       return {
         userId: user.id,
         name: user.name,
+        email: user.email,
         designation: user.designation,
         role: user.role,
         monthlySalary: monthlySalary.toFixed(2),
         dailySalary: dailySalary.toFixed(2),
         hourlySalary: hourlySalary.toFixed(2),
         perMinuteSalary: perMinuteSalary.toFixed(4),
-        presentDays,
-        absentDays,
+        presentDays: presentCount,
+        halfDays: halfDayCount,
+        woDays: woCount,
+        clDays: clCount,
+        slDays: slCount,
+        coDays: coCount,
+        holidayDays: holidayCount,
+        lopDays: lopCount,
+        absentDays: absentCount,
+        paidDays,
+        deductedDays,
         lateDays,
         totalWorkingHours: totalWorkingHours.toFixed(1),
         totalOvertimeMinutes: totalOvertime,
