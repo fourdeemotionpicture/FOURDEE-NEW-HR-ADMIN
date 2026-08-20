@@ -28,13 +28,35 @@ export async function POST(request: NextRequest) {
 
     const adminId = adminUser.id;
 
-    // 2. Perform transaction to clear and rebuild
+    // 2. Pre-calculate running balances working backwards from the sheet's Day End Balance overrides
+    // This aligns the database running balance 100% with manual overrides/resets in the spreadsheet.
+    let lastKnownBalance = 0.0;
+    for (let i = rows.length - 1; i >= 0; i--) {
+      if (rows[i].dayEndBalance !== null && rows[i].dayEndBalance !== undefined) {
+        lastKnownBalance = parseFloat(rows[i].dayEndBalance);
+        break;
+      }
+    }
+
+    let currentBal = lastKnownBalance;
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const row = rows[i];
+      if (row.dayEndBalance !== null && row.dayEndBalance !== undefined) {
+        currentBal = parseFloat(row.dayEndBalance);
+      }
+      row.calculatedBalanceAfter = currentBal;
+      
+      const amount = parseFloat(row.amount || "0");
+      const opening = parseFloat(row.opening || "0");
+      currentBal = currentBal + amount - opening;
+    }
+
+    // 3. Perform transaction to clear and rebuild
     await db.transaction(async (tx) => {
       // Clear existing records
       await tx.delete(expenses);
       await tx.delete(pettyCash);
 
-      let runningBalance = 0.0;
       const baseTime = new Date();
 
       for (let i = 0; i < rows.length; i++) {
@@ -45,29 +67,11 @@ export async function POST(request: NextRequest) {
         const amount = parseFloat(row.amount || "0");
         const opening = parseFloat(row.opening || "0");
         const billUrl = row.billUrl || null;
-        const dayEndBalance = row.dayEndBalance !== undefined && row.dayEndBalance !== null ? parseFloat(row.dayEndBalance) : null;
+        
+        const balanceAfter = row.calculatedBalanceAfter !== undefined ? row.calculatedBalanceAfter : 0.0;
 
         // Calculate sequential row timestamps separated by 1 second to preserve exact order
         const rowTime = new Date(baseTime.getTime() + i * 1000);
-
-        // Calculate transaction balances
-        let cashBalance = runningBalance + opening;
-        let expenseBalance = runningBalance + opening - amount;
-
-        // Override with spreadsheet Day End Balance if present
-        if (dayEndBalance !== null) {
-          if (opening > 0 && amount > 0) {
-            cashBalance = dayEndBalance + amount;
-            expenseBalance = dayEndBalance;
-          } else if (opening > 0) {
-            cashBalance = dayEndBalance;
-          } else if (amount > 0) {
-            expenseBalance = dayEndBalance;
-          }
-          runningBalance = dayEndBalance;
-        } else {
-          runningBalance = runningBalance + opening - amount;
-        }
 
         // Process Cash Addition (Opening Petty Cash)
         if (opening > 0) {
@@ -78,6 +82,9 @@ export async function POST(request: NextRequest) {
           if (category && category !== "Other" && category !== "add petty cash") {
             notes += ` (${category})`;
           }
+
+          // Balance after cash addition is balanceAfter + amount (if there was an expense in this row)
+          const cashBalance = balanceAfter + amount;
 
           await tx.insert(pettyCash).values({
             date: dateStr,
@@ -98,7 +105,7 @@ export async function POST(request: NextRequest) {
             amount: (-amount).toFixed(2),
             notes: `Expense: ${category}`,
             type: "expense",
-            balanceAfter: expenseBalance.toFixed(2),
+            balanceAfter: balanceAfter.toFixed(2),
             createdBy: adminId,
             createdAt: rowTime,
           });
@@ -110,7 +117,7 @@ export async function POST(request: NextRequest) {
             amount: amount.toFixed(2),
             notes: description || null,
             billUrl: billUrl || null,
-            balanceAfter: expenseBalance.toFixed(2),
+            balanceAfter: balanceAfter.toFixed(2),
             createdBy: adminId,
             createdAt: rowTime,
           });
