@@ -35,18 +35,42 @@ export async function POST(request: NextRequest) {
       await tx.delete(pettyCash);
 
       let runningBalance = 0.0;
+      const baseTime = new Date();
 
-      for (const row of rows) {
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
         const dateStr = row.date; // formatted as YYYY-MM-DD
         const category = row.category || "Other";
         const description = row.description || "";
         const amount = parseFloat(row.amount || "0");
         const opening = parseFloat(row.opening || "0");
         const billUrl = row.billUrl || null;
+        const dayEndBalance = row.dayEndBalance !== undefined && row.dayEndBalance !== null ? parseFloat(row.dayEndBalance) : null;
+
+        // Calculate sequential row timestamps separated by 1 second to preserve exact order
+        const rowTime = new Date(baseTime.getTime() + i * 1000);
+
+        // Calculate transaction balances
+        let cashBalance = runningBalance + opening;
+        let expenseBalance = runningBalance + opening - amount;
+
+        // Override with spreadsheet Day End Balance if present
+        if (dayEndBalance !== null) {
+          if (opening > 0 && amount > 0) {
+            cashBalance = dayEndBalance + amount;
+            expenseBalance = dayEndBalance;
+          } else if (opening > 0) {
+            cashBalance = dayEndBalance;
+          } else if (amount > 0) {
+            expenseBalance = dayEndBalance;
+          }
+          runningBalance = dayEndBalance;
+        } else {
+          runningBalance = runningBalance + opening - amount;
+        }
 
         // Process Cash Addition (Opening Petty Cash)
         if (opening > 0) {
-          runningBalance += opening;
           let notes = "Add petty cash (Opening)";
           if (description) {
             notes = `Add petty cash: ${description}`;
@@ -60,23 +84,23 @@ export async function POST(request: NextRequest) {
             amount: opening.toFixed(2),
             notes: notes,
             type: "received",
-            balanceAfter: runningBalance.toFixed(2),
+            balanceAfter: cashBalance.toFixed(2),
             createdBy: adminId,
+            createdAt: rowTime,
           });
         }
 
         // Process Expense
         if (amount > 0) {
-          runningBalance -= amount;
-
           // Insert into petty_cash (expense leg)
           await tx.insert(pettyCash).values({
             date: dateStr,
             amount: (-amount).toFixed(2),
             notes: `Expense: ${category}`,
             type: "expense",
-            balanceAfter: runningBalance.toFixed(2),
+            balanceAfter: expenseBalance.toFixed(2),
             createdBy: adminId,
+            createdAt: rowTime,
           });
 
           // Insert into expenses
@@ -86,8 +110,9 @@ export async function POST(request: NextRequest) {
             amount: amount.toFixed(2),
             notes: description || null,
             billUrl: billUrl || null,
-            balanceAfter: runningBalance.toFixed(2),
+            balanceAfter: expenseBalance.toFixed(2),
             createdBy: adminId,
+            createdAt: rowTime,
           });
         }
       }

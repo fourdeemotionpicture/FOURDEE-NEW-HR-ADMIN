@@ -49,6 +49,7 @@ function syncSheetToPortal() {
     let rawDesc = row[2] ? String(row[2]).trim() : "";
     let rawAmount = row[3] ? String(row[3]).trim() : "";
     let rawOpening = row[4] ? String(row[4]).trim() : "";
+    let rawBalance = row[7] ? String(row[7]).trim() : "";
     let rawBillUrl = row[8] ? String(row[8]).trim() : ""; // Column I (9th column) for Bill URLs
 
     // Parse DD/MM/YYYY display string manually to YYYY-MM-DD
@@ -79,16 +80,23 @@ function syncSheetToPortal() {
       opening = parseFloat(cleanedOpening) || 0.0;
     }
 
+    let dayEndBalance = null;
+    if (rawBalance) {
+      const cleanedBalance = String(rawBalance).replace(/[^0-9.-]/g, "");
+      dayEndBalance = parseFloat(cleanedBalance) || null;
+    }
+
     if (amount === 0.0 && opening === 0.0) {
       continue; // Skip blank lines
     }
 
-    rows.append = rows.push({
+    rows.push({
       date: dateStr,
       category: lastCategory || "Other",
       description: String(rawDesc || "").trim(),
       amount: amount,
       opening: opening,
+      dayEndBalance: dayEndBalance,
       billUrl: String(rawBillUrl).trim()
     });
   }
