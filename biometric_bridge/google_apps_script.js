@@ -1,5 +1,5 @@
 /**
- * Four Dee ERP - Google Sheets 2-Way Sync Script
+ * Four Dee ERP - Google Sheets 2-Way Sync Script (Updated Columns Layout)
  * 
  * Paste this script in your Google Sheet (Extensions -> Apps Script).
  * Set the WEBSITE_URL to your active HR Portal URL.
@@ -8,8 +8,8 @@
  * 1. Click "Deploy" -> "New deployment"
  * 2. Select type: "Web app"
  * 3. Set "Execute as": "Me (your-email)"
- * 4. Set "Who has access": "Anyone" (crucial so Next.js can send updates back)
- * 5. Copy the generated Web App URL and set it as GOOGLE_SHEET_WEB_APP_URL in your Vercel/Website environment variables.
+ * 4. Set "Who has access": "Anyone"
+ * 5. Copy the Web App URL and set it as GOOGLE_SHEET_WEB_APP_URL in Vercel environment variables.
  */
 
 const WEBSITE_URL = "https://fourdee-new-hr-admin-taupe.vercel.app";
@@ -29,7 +29,7 @@ function onOpen() {
 function syncSheetToPortal() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
   const range = sheet.getDataRange();
-  const values = range.getDisplayValues();
+  const values = range.getDisplayValues(); // Retrieve formatted screen text
   
   if (values.length <= 1) {
     SpreadsheetApp.getUi().alert("Sheet is empty!");
@@ -47,10 +47,10 @@ function syncSheetToPortal() {
     let rawDate = row[0] ? String(row[0]).trim() : "";
     let rawCategory = row[1] ? String(row[1]).trim() : "";
     let rawDesc = row[2] ? String(row[2]).trim() : "";
-    let rawAmount = row[3] ? String(row[3]).trim() : "";
-    let rawOpening = row[4] ? String(row[4]).trim() : "";
-    let rawBalance = row[7] ? String(row[7]).trim() : "";
-    let rawBillUrl = row[8] ? String(row[8]).trim() : ""; // Column I (9th column) for Bill URLs
+    let rawOpening = row[3] ? String(row[3]).trim() : ""; // Column D: ADDED Petty Cash
+    let rawAmount = row[4] ? String(row[4]).trim() : "";  // Column E: SPENDED
+    let rawBalance = row[5] ? String(row[5]).trim() : "";  // Column F: BALANCE
+    let rawBillUrl = row[6] ? String(row[6]).trim() : "";  // Column G: Bill URL (if present)
 
     // Parse DD/MM/YYYY display string manually to YYYY-MM-DD
     let dateStr = "";
@@ -154,18 +154,16 @@ function doPost(e) {
         }
       }
 
-      // Prepare row structure
-      // Date (Col A), Category (Col B), Description (Col C), Amount (Col D), Opening (Col E), Balance Petty Cash (Col F), Day Expense (Col G), Day End Balance (Col H), Bill URL (Col I)
+      // Prepare row structure based on new layout:
+      // Date (Col A), Category (Col B), Description (Col C), ADDED Petty Cash (Col D), SPENDED (Col E), BALANCE (Col F), Bill URL (Col G)
       const newRow = [
         displayDate,
         data.paidTo || data.category || "",
         data.notes || "",
-        data.type === "expense" ? data.amount : "",
-        data.type === "petty_cash" ? data.amount : "",
-        "", // Column F
-        "", // Column G
-        "", // Column H - Can write calculated balance
-        data.billUrl || "" // Column I
+        data.type === "petty_cash" ? data.amount : "", // Column D: ADDED
+        data.type === "expense" ? data.amount : "",    // Column E: SPENDED
+        data.balanceAfter || "",                        // Column F: BALANCE
+        data.billUrl || ""                             // Column G: Bill URL
       ];
       
       sheet.appendRow(newRow);
@@ -204,9 +202,9 @@ function doPost(e) {
         
         let rowAmount = 0.0;
         if (data.type === "expense") {
-          rowAmount = parseFloat(row[3]) || 0.0;
+          rowAmount = parseFloat(row[4]) || 0.0; // Column E: SPENDED
         } else {
-          const cleanedOpening = String(row[4] || "").replace(/[^0-9.]/g, "");
+          const cleanedOpening = String(row[3] || "").replace(/[^0-9.]/g, ""); // Column D: ADDED Petty Cash
           rowAmount = parseFloat(cleanedOpening) || 0.0;
         }
 
