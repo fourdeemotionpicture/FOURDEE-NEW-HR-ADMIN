@@ -100,7 +100,7 @@ export default function WorkReportsPage() {
   return (
     <AppShell>
       <div className="space-y-6">
-        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Work Reports</h1>
             <p className="text-sm text-gray-500 mt-0.5">Daily work report submissions</p>
@@ -116,24 +116,24 @@ export default function WorkReportsPage() {
         {isManager ? (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
             <div className="card p-4 space-y-3 md:col-span-1">
-              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Employees</h3>
-              <div className="space-y-1.5 max-h-[500px] overflow-y-auto pr-1">
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1 md:mb-2">Employees</h3>
+              <div className="flex flex-row md:flex-col gap-2 overflow-x-auto md:overflow-y-auto max-h-[120px] md:max-h-[500px] pb-2 md:pb-0 pr-1">
                 {employees.map((emp) => (
                   <button
                     key={emp.id}
                     onClick={() => setSelectedEmployeeId(emp.id)}
-                    className={`w-full text-left p-3 rounded-xl border transition-all flex items-center gap-3 ${
+                    className={`w-auto md:w-full shrink-0 text-left p-2.5 md:p-3 rounded-xl border transition-all flex items-center gap-2 md:gap-3 ${
                       selectedEmployeeId === emp.id
                         ? "border-blue-500 bg-blue-50/50 text-blue-900 shadow-sm"
                         : "border-gray-100 bg-white text-gray-700 hover:bg-gray-50"
                     }`}
                   >
-                    <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center font-bold text-blue-600 text-xs shrink-0">
+                    <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-blue-100 flex items-center justify-center font-bold text-blue-600 text-xs shrink-0">
                       {emp.name.charAt(0)}
                     </div>
-                    <div className="truncate">
-                      <p className="text-sm font-semibold truncate">{emp.name}</p>
-                      <p className="text-xs text-gray-500 truncate">{emp.designation || "Employee"}</p>
+                    <div className="truncate text-left">
+                      <p className="text-xs md:text-sm font-semibold truncate">{emp.name}</p>
+                      <p className="hidden md:block text-xs text-gray-500 truncate">{emp.designation || "Employee"}</p>
                     </div>
                   </button>
                 ))}
@@ -141,10 +141,10 @@ export default function WorkReportsPage() {
             </div>
 
             <div className="md:col-span-3 space-y-6">
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 <div className="kpi-card"><p className="text-xs text-gray-500">Total Reports</p><p className="text-xl font-bold text-blue-600">{reports.length}</p></div>
                 <div className="kpi-card"><p className="text-xs text-gray-500">Days Reported</p><p className="text-xl font-bold text-emerald-600">{sortedDates.length}</p></div>
-                <div className="kpi-card"><p className="text-xs text-gray-500">This Month</p><p className="text-xl font-bold text-gray-900">{format(currentMonth, "MMM yyyy")}</p></div>
+                <div className="kpi-card col-span-2 sm:col-span-1"><p className="text-xs text-gray-500">This Month</p><p className="text-xl font-bold text-gray-900">{format(currentMonth, "MMM yyyy")}</p></div>
               </div>
 
               <div className="card p-4 flex items-center justify-between">

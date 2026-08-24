@@ -94,7 +94,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <AppShell>
-        <div className="grid grid-cols-4 gap-5">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
           {[...Array(8)].map((_, i) => (
             <div key={i} className="h-28 rounded-2xl bg-white animate-pulse border border-gray-100" />
           ))}

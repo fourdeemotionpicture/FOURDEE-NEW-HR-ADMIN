@@ -103,12 +103,12 @@ export default function ExpensesPage() {
   return (
     <AppShell>
       <div className="space-y-6">
-        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Office Expenses</h1>
             <p className="text-sm text-gray-500 mt-0.5">Manage petty cash and office expenses</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button onClick={handleExport} className="btn-secondary"><Receipt className="w-4.5 h-4.5" /> Export</button>
             {userRole !== "owner_admin" && (
               <>
@@ -120,7 +120,7 @@ export default function ExpensesPage() {
         </motion.div>
 
         {/* Balance Cards */}
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="kpi-card">
             <p className="text-xs text-gray-500">Current Balance</p>
             <p className="text-xl font-bold text-emerald-600">₹{parseFloat(currentBalance).toLocaleString()}</p>

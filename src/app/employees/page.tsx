@@ -96,7 +96,45 @@ export default function EmployeesPage() {
           </div>
         </div>
 
-        <div className="card overflow-hidden">
+        {/* Mobile View: Cards */}
+        <div className="grid grid-cols-1 gap-4 md:hidden">
+          {loading ? (
+            <div className="text-center py-8 text-gray-400">Loading...</div>
+          ) : employees.length === 0 ? (
+            <div className="text-center py-8 text-gray-400">No employees found</div>
+          ) : employees.map((emp) => (
+            <div key={emp.id} className="card p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
+                    <span className="text-sm font-semibold text-blue-600">{emp.name.charAt(0)}</span>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900">{emp.name}</h3>
+                    <p className="text-xs text-gray-500">{emp.designation || "-"}</p>
+                  </div>
+                </div>
+                <span className={`badge ${roleBadge(emp.role)}`}>{emp.role.replace("_", " ")}</span>
+              </div>
+              <div className="space-y-1.5 text-xs text-gray-600 pt-2 border-t border-gray-50">
+                <div className="flex justify-between"><span className="text-gray-400">Email:</span><span className="break-all">{emp.email}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">Monthly Salary:</span><span>₹{parseFloat(emp.monthlySalary || "0").toLocaleString()}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">Biometric ID:</span><span className="font-mono text-blue-600">{emp.biometricId || "-"}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">Date of Birth:</span><span>{emp.dob ? format(new Date(emp.dob), "MMM dd, yyyy") : "-"}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">Status:</span><span className={`badge ${emp.isActive ? "badge-success" : "badge-danger"}`}>{emp.isActive ? "Active" : "Inactive"}</span></div>
+              </div>
+              {userRole !== "owner_admin" && (
+                <div className="flex items-center justify-end gap-2 border-t border-gray-100 pt-2.5 mt-1">
+                  <button onClick={() => handleEdit(emp)} className="px-2.5 py-1.5 rounded-lg bg-gray-50 text-gray-600 hover:bg-gray-100 text-xs font-semibold flex items-center gap-1.5"><Edit2 className="w-3.5 h-3.5" /> Edit</button>
+                  <button onClick={() => handleDelete(emp.id)} className="px-2.5 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 text-xs font-semibold flex items-center gap-1.5"><Trash2 className="w-3.5 h-3.5" /> Deactivate</button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop View: Table */}
+        <div className="card overflow-hidden hidden md:block">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>

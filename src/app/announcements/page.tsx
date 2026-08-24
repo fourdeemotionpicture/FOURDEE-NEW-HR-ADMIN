@@ -45,7 +45,7 @@ export default function AnnouncementsPage() {
   return (
     <AppShell>
       <div className="space-y-6">
-        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Announcements</h1>
             <p className="text-sm text-gray-500 mt-0.5">Company announcements and updates</p>
@@ -56,7 +56,7 @@ export default function AnnouncementsPage() {
         </motion.div>
 
         {loading ? (
-          <div className="grid grid-cols-2 gap-4">{[...Array(4)].map((_, i) => <div key={i} className="h-48 rounded-2xl bg-white animate-pulse border border-gray-100" />)}</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{[...Array(4)].map((_, i) => <div key={i} className="h-48 rounded-2xl bg-white animate-pulse border border-gray-100" />)}</div>
         ) : announcements.length === 0 ? (
           <div className="card p-12 text-center">
             <Megaphone className="w-12 h-12 text-gray-300 mx-auto mb-3" />

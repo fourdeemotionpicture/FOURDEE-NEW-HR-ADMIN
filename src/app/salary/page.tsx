@@ -147,12 +147,12 @@ export default function SalaryPage() {
           }
         `}} />
 
-        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between print:hidden">
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between print:hidden">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Salary Management</h1>
             <p className="text-sm text-gray-500 mt-0.5">Automated payslips & leave calculations</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {isManager && (
               <button 
                 onClick={handleSendEmails} 
