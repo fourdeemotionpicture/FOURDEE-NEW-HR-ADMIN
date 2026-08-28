@@ -36,6 +36,7 @@ interface DashboardData {
   todayWorkReports: number;
   monthlyWorkReports: number;
   attendanceTrend: { date: string; present: number; late: number }[];
+  pendingLeavesCount?: number;
 }
 
 const COLORS = ["#2563EB", "#F59E0B", "#10B981", "#EF4444", "#8B5CF6"];
@@ -116,6 +117,31 @@ export default function DashboardPage() {
             <span className="badge badge-success">System Online</span>
           </div>
         </motion.div>
+
+        {/* Pending Leaves Alert */}
+        {data && data.pendingLeavesCount && data.pendingLeavesCount > 0 ? (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-4 rounded-2xl bg-amber-50 border border-amber-100 text-amber-850 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm"
+          >
+            <div className="flex items-center gap-2.5">
+              <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold">Pending Leave Requests Alert</p>
+                <p className="text-xs text-amber-700 mt-0.5">
+                  There are <span className="font-bold text-amber-900">{data.pendingLeavesCount}</span> leave requests waiting for your review.
+                </p>
+              </div>
+            </div>
+            <button 
+              onClick={() => window.location.href = "/attendance"}
+              className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold self-start sm:self-center transition-colors shadow-sm"
+            >
+              Review Leaves
+            </button>
+          </motion.div>
+        ) : null}
 
         {/* KPI Cards */}
         {isEmployee ? (

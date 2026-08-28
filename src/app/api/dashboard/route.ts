@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/db";
-import { users, attendance, workReports, expenses, pettyCash } from "@/db/schema";
+import { users, attendance, workReports, expenses, pettyCash, leaveRequests } from "@/db/schema";
 import { eq, and, gte, lte, sql, count, sum } from "drizzle-orm";
 import { format, startOfMonth, endOfMonth, startOfDay, endOfDay, getDaysInMonth } from "date-fns";
 
@@ -131,6 +131,13 @@ export async function GET() {
       });
     }
 
+    // Count pending leave requests
+    let pendingLeavesCount = 0;
+    if (currentUser.role === "super_admin" || currentUser.role === "owner_admin") {
+      const pendingReqs = await db.select().from(leaveRequests).where(eq(leaveRequests.status, "pending"));
+      pendingLeavesCount = pendingReqs.length;
+    }
+
     return NextResponse.json({
       userRole: currentUser.role,
       employeeSalary,
@@ -147,6 +154,7 @@ export async function GET() {
       todayWorkReports: isEmployee ? todayWorkReports.filter((w) => w.userId === employeeId).length : todayWorkReports.length,
       monthlyWorkReports: filteredWorkReports.length,
       attendanceTrend,
+      pendingLeavesCount,
     });
   } catch (error) {
     console.error("Dashboard error:", error);
