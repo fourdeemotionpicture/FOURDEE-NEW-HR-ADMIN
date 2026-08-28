@@ -84,7 +84,7 @@ export default function WorkReportsPage() {
 
   const handleExport = () => {
     const headers = ["Date", "Employee", "Description", "Notes"];
-    const rows = reports.map((r) => [r.date, r.userName || "", r.description, r.notes || ""]);
+    const rows = reports.map((r) => [`'${r.date}`, r.userName || "", r.description, r.notes || ""]);
     const csv = [headers.join(","), ...rows.map((r) => r.map((c) => `"${c}"`).join(","))].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);

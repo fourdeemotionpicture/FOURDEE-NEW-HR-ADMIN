@@ -89,7 +89,7 @@ export default function ExpensesPage() {
 
   const handleExport = () => {
     const headers = ["Date", "Paid To", "Amount", "Notes", "Balance After"];
-    const rows = expenses.map((e) => [e.date, e.paidTo, e.amount, e.notes || "", e.balanceAfter || ""]);
+    const rows = expenses.map((e) => [`'${e.date}`, e.paidTo, e.amount, e.notes || "", e.balanceAfter || ""]);
     const csv = [headers.join(","), ...rows.map((r) => r.map((c) => `"${c}"`).join(","))].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
