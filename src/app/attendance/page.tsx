@@ -63,6 +63,8 @@ export default function AttendancePage() {
   const [leaveForm, setLeaveForm] = useState({ startDate: "", endDate: "", type: "CL", reason: "" });
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [clBalance, setClBalance] = useState({ accrued: 0, used: 0, available: 0 });
+  const [coBalance, setCoBalance] = useState({ accrued: 0, used: 0, available: 0 });
+  const [holidaysList, setHolidaysList] = useState<{ id: string; name: string; date: string }[]>([]);
 
   const monthStr = format(currentMonth, "yyyy-MM");
   const isManager = userRole === "super_admin" || userRole === "owner_admin";
@@ -81,6 +83,7 @@ export default function AttendancePage() {
     const leaveData = await leaveRes.json();
     setLeaveRequests(leaveData.requests || []);
     setClBalance(leaveData.clBalance || { accrued: 0, used: 0, available: 0 });
+    setCoBalance(leaveData.coBalance || { accrued: 0, used: 0, available: 0 });
 
     setLoading(false);
   }, [monthStr, selectedEmployeeId]);
@@ -95,6 +98,11 @@ export default function AttendancePage() {
           setSelectedEmployeeId(d.id);
         }
       })
+      .catch(console.error);
+
+    fetch("/api/holidays")
+      .then((r) => r.json())
+      .then((d) => setHolidaysList(d.holidays || []))
       .catch(console.error);
   }, []);
 
@@ -327,15 +335,20 @@ export default function AttendancePage() {
           <div className={`${isManager ? "lg:col-span-3" : ""} space-y-6 overflow-y-auto h-auto lg:h-[calc(100vh-220px)] pr-2`}>
             
             {/* Quota Summary & Stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4">
               <div className="kpi-card bg-purple-50/20 border-purple-100/50">
                 <p className="text-xs text-purple-600 font-medium">Casual Leave Quota</p>
                 <p className="text-xl font-bold text-purple-700 mt-1">{clBalance.available} CL left</p>
                 <p className="text-[10px] text-gray-400 mt-0.5">Accrued: {clBalance.accrued} | Used: {clBalance.used}</p>
               </div>
+              <div className="kpi-card bg-indigo-50/20 border-indigo-100/50">
+                <p className="text-xs text-indigo-600 font-medium">Comp Off Balance</p>
+                <p className="text-xl font-bold text-indigo-700 mt-1">{coBalance.available} CO left</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">Earned: {coBalance.accrued} | Used: {coBalance.used}</p>
+              </div>
               <div className="kpi-card"><p className="text-xs text-gray-500">Present (Full)</p><p className="text-xl font-bold text-emerald-600 mt-1">{presentCount}</p></div>
               <div className="kpi-card"><p className="text-xs text-gray-500 font-medium text-red-600">Late Days</p><p className="text-xl font-bold text-red-600 mt-1">{lateCount}</p></div>
-              <div className="kpi-card"><p className="text-xs text-gray-500">Total Hours</p><p className="text-xl font-bold text-gray-900 mt-1">{totalHours.toFixed(1)}</p></div>
+              <div className="kpi-card col-span-2 sm:col-span-1"><p className="text-xs text-gray-500">Total Hours</p><p className="text-xl font-bold text-gray-900 mt-1">{totalHours.toFixed(1)}</p></div>
             </div>
 
             {/* Month Navigator */}
@@ -361,6 +374,7 @@ export default function AttendancePage() {
                   const record = getRecordForDate(dateStr);
                   const isToday = dateStr === today;
                   const isSunday = getDay(day) === 0;
+                  const holidayInfo = holidaysList.find((h) => h.date === dateStr);
 
                   return (
                     <motion.div
@@ -370,7 +384,7 @@ export default function AttendancePage() {
                       onClick={() => handleDayClick(day)}
                       className={`p-2 rounded-xl border transition-all cursor-pointer hover:border-blue-200 min-h-[70px]
                         ${isToday ? "border-blue-300 bg-blue-50/50" : "border-transparent"}
-                        ${record ? "bg-gray-50" : isSunday ? "bg-gray-50/30 text-gray-400" : "hover:bg-gray-50/50"}`}
+                        ${holidayInfo ? "bg-amber-50/40 border-amber-200/60" : record ? "bg-gray-50" : isSunday ? "bg-gray-50/30 text-gray-400" : "hover:bg-gray-50/50"}`}
                     >
                       <div className="flex items-center justify-between mb-1">
                         <span className={`text-xs font-medium ${isToday ? "text-blue-600 font-bold" : isSunday ? "text-gray-400" : "text-gray-700"}`}>{format(day, "d")}</span>
@@ -378,10 +392,17 @@ export default function AttendancePage() {
                           <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${STATUS_COLORS[record.status] || "bg-gray-100 text-gray-700"}`}>
                             {record.status.toUpperCase()}
                           </span>
+                        ) : holidayInfo ? (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full border bg-amber-100 text-amber-800 border-amber-200">H</span>
                         ) : isSunday ? (
                           <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full border bg-gray-50 text-gray-400 border-gray-100">WO</span>
                         ) : null}
                       </div>
+                      {holidayInfo && (
+                        <p className="text-[9px] font-semibold text-amber-800 truncate mb-0.5" title={holidayInfo.name}>
+                          🎉 {holidayInfo.name}
+                        </p>
+                      )}
                       {record && (
                         <div className="space-y-0.5">
                           {record.inTime && <p className="text-[10px] text-gray-500">In: {record.inTime}</p>}
@@ -549,14 +570,27 @@ export default function AttendancePage() {
                   <select 
                     value={leaveForm.type} 
                     onChange={(e) => setLeaveForm({ ...leaveForm, type: e.target.value })} 
-                    className="input-field"
+                    className="input-field font-medium text-gray-900"
                   >
-                    <option value="CL">Casual Leave (CL) - Roll-over</option>
+                    <option value="CL">Casual Leave (CL) - {clBalance.available} day(s) left</option>
+                    <option value="CO">Comp Off (CO) - {coBalance.available} day(s) earned</option>
                     <option value="SL">Sick Leave (SL)</option>
-                    <option value="CO">Comp Off (CO)</option>
                     <option value="H">Holiday (H) Request</option>
                   </select>
                 </div>
+
+                {leaveForm.type === "CO" && (
+                  <div className="p-2.5 rounded-lg bg-indigo-50 border border-indigo-100 text-xs text-indigo-800">
+                    🏆 <b>Comp Off Balance:</b> You have <b>{coBalance.available}</b> day(s) available earned from working on public holidays or Sundays.
+                  </div>
+                )}
+
+                {leaveForm.type === "CL" && (
+                  <div className="p-2.5 rounded-lg bg-purple-50 border border-purple-100 text-xs text-purple-800">
+                    ✨ <b>Casual Leave Balance:</b> You have <b>{clBalance.available}</b> day(s) left in your annual quota.
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
@@ -571,7 +605,7 @@ export default function AttendancePage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Reason for Leave</label>
                   <textarea value={leaveForm.reason} onChange={(e) => setLeaveForm({ ...leaveForm, reason: e.target.value })} className="input-field min-h-[80px]" required placeholder="State your reason..." />
                 </div>
-                <p className="text-xs text-gray-400">Note: Leave requests (except CL within quota) will be sent to the Super Admin for approval. You will receive an email once approved or rejected.</p>
+                <p className="text-xs text-gray-400">Note: Leave requests within available quota (CL or CO) are auto-approved. Other requests will be sent to the Super Admin for approval.</p>
                 <button type="submit" className="btn-primary w-full justify-center">Submit Request</button>
               </form>
             </motion.div>

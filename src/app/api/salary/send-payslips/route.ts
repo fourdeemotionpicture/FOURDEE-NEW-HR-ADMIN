@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/db";
-import { users, attendance } from "@/db/schema";
+import { users, attendance, holidays } from "@/db/schema";
 import { eq, and, gte, lte } from "drizzle-orm";
 import { format, startOfMonth, endOfMonth, parse, subMonths, getDaysInMonth, eachDayOfInterval, getDay } from "date-fns";
 import { sendEmail } from "@/lib/email";
@@ -36,11 +36,16 @@ export async function POST(request: NextRequest) {
     const totalDaysInMonth = getDaysInMonth(monthDate);
     const calendarDays = eachDayOfInterval({ start: startOfMonth(monthDate), end: endOfMonth(monthDate) });
 
+    // Fetch official holidays
+    const officialHolidays = await db.select({ date: holidays.date }).from(holidays);
+    const holidayDateSet = new Set(officialHolidays.map((h) => h.date));
+
     // 3. Fetch active employees
     const allUsers = await db.select({
       id: users.id,
       name: users.name,
       email: users.email,
+      personalEmail: users.personalEmail,
       role: users.role,
       designation: users.designation,
       monthlySalary: users.monthlySalary,
@@ -120,6 +125,9 @@ export async function POST(request: NextRequest) {
         } else {
           if (getDay(day) === 0) {
             woCount++;
+            paidDays += 1.0;
+          } else if (holidayDateSet.has(dateStr)) {
+            holidayCount++;
             paidDays += 1.0;
           } else {
             absentCount++;
@@ -201,9 +209,10 @@ export async function POST(request: NextRequest) {
         </div>
       `;
 
-      if (user.email) {
+      const targetMail = user.personalEmail || user.email;
+      if (targetMail) {
         const mailResult = await sendEmail({
-          to: user.email,
+          to: targetMail,
           subject: `📄 Salary Payslip - ${formattedMonth} - Four Dee Motion Picture`,
           html: htmlBody,
         });
@@ -211,7 +220,7 @@ export async function POST(request: NextRequest) {
         if (mailResult.success) {
           sentCount++;
         } else {
-          failures.push(`${user.name} (${user.email})`);
+          failures.push(`${user.name} (${targetMail})`);
         }
       }
     }

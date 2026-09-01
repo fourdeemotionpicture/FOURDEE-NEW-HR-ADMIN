@@ -7,7 +7,17 @@ import AppShell from "@/components/AppShell";
 import { format } from "date-fns";
 
 interface Employee {
-  id: string; name: string; email: string; role: string; designation: string; monthlySalary: string; dob?: string; biometricId?: number | null; isActive: boolean;
+  id: string; 
+  name: string; 
+  email: string; 
+  personalEmail?: string | null;
+  phone?: string | null;
+  role: string; 
+  designation: string; 
+  monthlySalary: string; 
+  dob?: string; 
+  biometricId?: number | null; 
+  isActive: boolean;
 }
 
 export default function EmployeesPage() {
@@ -16,7 +26,18 @@ export default function EmployeesPage() {
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", email: "", password: "", role: "employee", designation: "", monthlySalary: "", dob: "", biometricId: "" });
+  const [form, setForm] = useState({ 
+    name: "", 
+    email: "", 
+    personalEmail: "",
+    phone: "",
+    password: "", 
+    role: "employee", 
+    designation: "", 
+    monthlySalary: "", 
+    dob: "", 
+    biometricId: "" 
+  });
 
   const fetchEmployees = async () => {
     const res = await fetch(`/api/employees?search=${search}`);
@@ -53,13 +74,24 @@ export default function EmployeesPage() {
     }
     setShowModal(false);
     setEditId(null);
-    setForm({ name: "", email: "", password: "", role: "employee", designation: "", monthlySalary: "", dob: "", biometricId: "" });
+    setForm({ name: "", email: "", personalEmail: "", phone: "", password: "", role: "employee", designation: "", monthlySalary: "", dob: "", biometricId: "" });
     fetchEmployees();
   };
 
   const handleEdit = (emp: Employee) => {
     setEditId(emp.id);
-    setForm({ name: emp.name, email: emp.email, password: "", role: emp.role, designation: emp.designation || "", monthlySalary: emp.monthlySalary || "", dob: emp.dob || "", biometricId: emp.biometricId ? String(emp.biometricId) : "" });
+    setForm({ 
+      name: emp.name, 
+      email: emp.email, 
+      personalEmail: emp.personalEmail || "",
+      phone: emp.phone || "",
+      password: "", 
+      role: emp.role, 
+      designation: emp.designation || "", 
+      monthlySalary: emp.monthlySalary || "", 
+      dob: emp.dob || "", 
+      biometricId: emp.biometricId ? String(emp.biometricId) : "" 
+    });
     setShowModal(true);
   };
 
@@ -203,8 +235,16 @@ export default function EmployeesPage() {
                   <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input-field" required />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Official Login Email</label>
                   <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="input-field" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Personal Email (for reports & payslips)</label>
+                  <input type="email" value={form.personalEmail} onChange={(e) => setForm({ ...form, personalEmail: e.target.value })} className="input-field" placeholder="personal@gmail.com" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                  <input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="input-field" placeholder="+91 9876543210" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Password {editId && "(leave blank to keep current)"}</label>

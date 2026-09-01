@@ -40,6 +40,8 @@ export async function GET(request: NextRequest) {
       id: users.id,
       name: users.name,
       email: users.email,
+      personalEmail: users.personalEmail,
+      phone: users.phone,
       role: users.role,
       designation: users.designation,
       monthlySalary: users.monthlySalary,
@@ -54,7 +56,8 @@ export async function GET(request: NextRequest) {
     if (search) {
       filtered = filtered.filter((u) =>
         u.name.toLowerCase().includes(search.toLowerCase()) ||
-        u.email.toLowerCase().includes(search.toLowerCase())
+        u.email.toLowerCase().includes(search.toLowerCase()) ||
+        (u.personalEmail && u.personalEmail.toLowerCase().includes(search.toLowerCase()))
       );
     }
     if (role) {
@@ -81,7 +84,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, email, password, role, designation, monthlySalary, dob, biometricId } = body;
+    const { name, email, personalEmail, phone, password, role, designation, monthlySalary, dob, biometricId } = body;
 
     if (!name || !email || !password) {
       return NextResponse.json({ error: "Name, email, and password are required" }, { status: 400 });
@@ -92,6 +95,8 @@ export async function POST(request: NextRequest) {
     const [user] = await db.insert(users).values({
       name,
       email: email.toLowerCase().trim(),
+      personalEmail: personalEmail ? personalEmail.toLowerCase().trim() : null,
+      phone: phone ? phone.trim() : null,
       passwordHash,
       role: role || "employee",
       designation: designation || "",
@@ -129,7 +134,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { id, name, role, designation, monthlySalary, isActive, password, dob, biometricId } = body;
+    const { id, name, email, personalEmail, phone, role, designation, monthlySalary, isActive, password, dob, biometricId } = body;
 
     if (!id) {
       return NextResponse.json({ error: "User ID is required" }, { status: 400 });
@@ -137,6 +142,9 @@ export async function PUT(request: NextRequest) {
 
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
     if (name !== undefined) updateData.name = name;
+    if (email !== undefined) updateData.email = email.toLowerCase().trim();
+    if (personalEmail !== undefined) updateData.personalEmail = personalEmail ? personalEmail.toLowerCase().trim() : null;
+    if (phone !== undefined) updateData.phone = phone ? phone.trim() : null;
     if (role !== undefined) updateData.role = role;
     if (designation !== undefined) updateData.designation = designation;
     if (monthlySalary !== undefined) updateData.monthlySalary = monthlySalary;

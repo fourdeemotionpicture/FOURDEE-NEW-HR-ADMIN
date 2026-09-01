@@ -11,6 +11,8 @@ export const users = pgTable("users", {
   monthlySalary: numeric("monthly_salary", { precision: 12, scale: 2 }).default("0"),
   dob: date("dob"),
   biometricId: integer("biometric_id").unique(),
+  personalEmail: varchar("personal_email", { length: 255 }),
+  phone: varchar("phone", { length: 50 }),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
@@ -134,4 +136,16 @@ export const leaveRequests = pgTable("leave_requests", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+// ─── Holidays ──────────────────────────────────────────────────────────────
+export const holidays = pgTable("holidays", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  date: date("date").notNull().unique(),
+  description: text("description"),
+  year: integer("year").notNull().default(2026),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 

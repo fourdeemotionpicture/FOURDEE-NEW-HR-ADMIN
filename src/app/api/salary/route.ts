@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/db";
-import { users, attendance } from "@/db/schema";
+import { users, attendance, holidays } from "@/db/schema";
 import { eq, and, gte, lte } from "drizzle-orm";
 import { format, startOfMonth, endOfMonth, parse, getDaysInMonth, eachDayOfInterval, getDay } from "date-fns";
 
@@ -21,6 +21,10 @@ export async function GET(request: NextRequest) {
     const endDate = format(endOfMonth(monthDate), "yyyy-MM-dd");
     const totalDaysInMonth = getDaysInMonth(monthDate);
     const calendarDays = eachDayOfInterval({ start: startOfMonth(monthDate), end: endOfMonth(monthDate) });
+
+    // Fetch official holidays for this year
+    const officialHolidays = await db.select({ date: holidays.date }).from(holidays);
+    const holidayDateSet = new Set(officialHolidays.map((h) => h.date));
 
     // Get employees
     let allUsers = await db.select({
@@ -105,6 +109,10 @@ export async function GET(request: NextRequest) {
           if (getDay(day) === 0) {
             // Sunday is automatically Week Off
             woCount++;
+            paidDays += 1.0;
+          } else if (holidayDateSet.has(dateStr)) {
+            // Official public holiday is automatically a paid day
+            holidayCount++;
             paidDays += 1.0;
           } else {
             // Weekday with no record is absent

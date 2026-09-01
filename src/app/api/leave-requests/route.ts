@@ -3,40 +3,9 @@ import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/db";
 import { leaveRequests, attendance, users } from "@/db/schema";
 import { eq, and, gte, lte, desc, inArray } from "drizzle-orm";
-import { format, parseISO, eachDayOfInterval, getDay, differenceInDays } from "date-fns";
+import { format, parseISO, eachDayOfInterval, getDay } from "date-fns";
 import { sendEmail } from "@/lib/email";
-
-// Helper to compute CL Balance
-async function getCLBalance(userId: string, targetDate: Date = new Date()) {
-  const currentMonth = targetDate.getMonth() + 1; // 1 to 12
-  const currentYear = targetDate.getFullYear();
-
-  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-  if (!user) return { accrued: 0, used: 0, available: 0 };
-
-  let startMonth = 1;
-  const joinDate = new Date(user.createdAt);
-  if (joinDate.getFullYear() === currentYear) {
-    startMonth = joinDate.getMonth() + 1;
-  }
-
-  // Earn 1 CL per month accrued in the calendar year
-  const accrued = Math.max(1, currentMonth - startMonth + 1);
-
-  // Get approved CL days in attendance for this calendar year
-  const approvedCLs = await db.select().from(attendance).where(
-    and(
-      eq(attendance.userId, userId),
-      eq(attendance.status, "CL"),
-      gte(attendance.date, `${currentYear}-01-01`),
-      lte(attendance.date, `${currentYear}-12-31`)
-    )
-  );
-
-  const used = approvedCLs.length;
-  const available = Math.max(0, accrued - used);
-  return { accrued, used, available };
-}
+import { getUserLeaveBalances } from "@/lib/leave-balances";
 
 export async function GET(request: NextRequest) {
   try {
@@ -74,11 +43,15 @@ export async function GET(request: NextRequest) {
       userName: userMap[r.userId] || "Unknown",
     }));
 
-    // Get current CL Balance for the logged-in user or requested user
+    // Get current CL & CO Balances for the logged-in user or requested user
     const targetUserId = userId || currentUser.userId;
-    const balance = await getCLBalance(targetUserId);
+    const balances = await getUserLeaveBalances(targetUserId);
 
-    return NextResponse.json({ requests: enriched, clBalance: balance });
+    return NextResponse.json({
+      requests: enriched,
+      clBalance: balances.clBalance,
+      coBalance: balances.coBalance,
+    });
   } catch (error) {
     console.error("Leave requests GET error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -102,16 +75,26 @@ export async function POST(request: NextRequest) {
     const start = parseISO(startDate);
     const end = parseISO(endDate);
     const daysInterval = eachDayOfInterval({ start, end });
-    const requestedDays = daysInterval.length;
+    const requestedDays = daysInterval.filter((d) => getDay(d) !== 0).length; // Exclude Sundays
+
+    if (requestedDays <= 0) {
+      return NextResponse.json({ error: "Selected dates fall entirely on Sunday (Week Off)" }, { status: 400 });
+    }
 
     const isAdmin = currentUser.role === "super_admin" || currentUser.role === "owner_admin";
     let status = "pending";
 
-    // Quota validation for CL
+    const balances = await getUserLeaveBalances(currentUser.userId);
+
+    // Quota validation for CL & CO
     if (type === "CL" && !isAdmin) {
-      const clBalance = await getCLBalance(currentUser.userId);
       // Auto-approve if they have sufficient CL quota left
-      if (clBalance.available >= requestedDays) {
+      if (balances.clBalance.available >= requestedDays) {
+        status = "approved";
+      }
+    } else if (type === "CO" && !isAdmin) {
+      // Auto-approve if they have sufficient Comp Off (CO) balance earned from Holidays/Sundays
+      if (balances.coBalance.available >= requestedDays) {
         status = "approved";
       }
     } else if (isAdmin) {
@@ -152,7 +135,7 @@ export async function POST(request: NextRequest) {
             workingHours: "0.00",
             lateMinutes: 0,
             overtimeMinutes: 0,
-            notes: `Leave Approved: ${type} - ${reason || ""}`,
+            notes: `Leave Auto-Approved (${type}): ${reason || ""}`,
             updatedAt: new Date(),
           }).where(eq(attendance.id, existing[0].id));
         } else {
@@ -161,28 +144,17 @@ export async function POST(request: NextRequest) {
             date: dateStr,
             status: type,
             source: "manual",
-            notes: `Leave Approved: ${type} - ${reason || ""}`,
+            notes: `Leave Auto-Approved (${type}): ${reason || ""}`,
           });
         }
       }
+    }
 
-      // Notify Admin and Employee
+    // Email notification if pending
+    if (status === "pending") {
       const [empUser] = await db.select().from(users).where(eq(users.id, currentUser.userId)).limit(1);
-      if (empUser && empUser.email) {
-        await sendEmail({
-          to: empUser.email,
-          subject: `Leave Auto-Approved: ${type}`,
-          html: `<h3>Hello ${empUser.name},</h3>
-                 <p>Your requested leave of type <b>${type}</b> from <b>${startDate}</b> to <b>${endDate}</b> has been <b>Auto-Approved</b> based on your available Casual Leave quota.</p>
-                 <p>Reason: ${reason || "Not specified"}</p>`,
-        });
-      }
-    } else {
-      // Pending request: Send notification email to all Admins
-      const admins = await db.select().from(users).where(inArray(users.role, ["super_admin", "owner_admin"]));
-      const adminEmails = admins.map((a) => a.email).filter(Boolean);
-      
-      const [empUser] = await db.select().from(users).where(eq(users.id, currentUser.userId)).limit(1);
+      const superAdmins = await db.select({ email: users.email }).from(users).where(eq(users.role, "super_admin"));
+      const adminEmails = superAdmins.map((a) => a.email).filter(Boolean);
 
       if (adminEmails.length > 0 && empUser) {
         await sendEmail({
@@ -191,7 +163,7 @@ export async function POST(request: NextRequest) {
           html: `<h3>New Leave Request Pending Approval</h3>
                  <p><b>Employee:</b> ${empUser.name}</p>
                  <p><b>Type:</b> ${type}</p>
-                 <p><b>Dates:</b> ${startDate} to ${endDate} (${requestedDays} day(s))</p>
+                 <p><b>Dates:</b> ${startDate} to ${endDate} (${requestedDays} working day(s))</p>
                  <p><b>Reason:</b> ${reason || "Not specified"}</p>
                  <p>Please log in to the HR Portal to approve or reject this request.</p>`,
         });
@@ -274,9 +246,9 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Email employee about Admin decision
-    if (employee && employee.email) {
+    if (employee && (employee.personalEmail || employee.email)) {
       await sendEmail({
-        to: employee.email,
+        to: employee.personalEmail || employee.email,
         subject: `Leave Request ${status.toUpperCase()}: ${leaveReq.type}`,
         html: `<h3>Hello ${employee.name},</h3>
                <p>Your leave request of type <b>${leaveReq.type}</b> from <b>${leaveReq.startDate}</b> to <b>${leaveReq.endDate}</b> has been <b>${status.toUpperCase()}</b> by Admin.</p>
@@ -290,4 +262,3 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
-

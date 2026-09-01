@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Share2,
   X,
+  UserCircle,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -31,6 +32,7 @@ interface SidebarProps {
 
 const menuItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["super_admin", "owner_admin", "office_admin", "employee"] },
+  { label: "My Profile", href: "/profile", icon: UserCircle, roles: ["super_admin", "owner_admin", "office_admin", "employee"] },
   { label: "Employees", href: "/employees", icon: Users, roles: ["super_admin", "owner_admin"] },
   { label: "Attendance", href: "/attendance", icon: Clock, roles: ["super_admin", "owner_admin", "office_admin", "employee"] },
   { label: "Salary", href: "/salary", icon: IndianRupee, roles: ["super_admin", "owner_admin"] },
