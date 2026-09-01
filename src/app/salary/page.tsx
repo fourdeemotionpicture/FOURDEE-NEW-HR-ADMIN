@@ -2,9 +2,15 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { IndianRupee, Download, ChevronLeft, ChevronRight, Mail, Printer } from "lucide-react";
+import { IndianRupee, Download, ChevronLeft, ChevronRight, Mail, Printer, Clock, Calendar, ShieldCheck, CheckCircle2, AlertCircle } from "lucide-react";
 import AppShell from "@/components/AppShell";
 import { format, addMonths, subMonths } from "date-fns";
+
+interface LeaveQuota {
+  accrued: number;
+  used: number;
+  available: number;
+}
 
 interface SalaryRecord {
   userId: string;
@@ -12,10 +18,15 @@ interface SalaryRecord {
   designation: string;
   role: string;
   email: string | null;
+  personalEmail?: string | null;
+  phone?: string | null;
+  dob?: string | null;
+  biometricId?: string | null;
   monthlySalary: string;
   dailySalary: string;
   hourlySalary: string;
   perMinuteSalary: string;
+  totalDaysInMonth?: number;
   presentDays: number;
   halfDays: number;
   woDays: number;
@@ -28,11 +39,22 @@ interface SalaryRecord {
   paidDays: number;
   deductedDays: number;
   lateDays: number;
+  totalLateMinutes?: number;
   totalWorkingHours: string;
   totalOvertimeMinutes: number;
+  totalOvertimeHours?: string;
   earnedSalary: string;
   deductions: string;
   finalPayableSalary: string;
+  clBalance?: LeaveQuota;
+  coBalance?: LeaveQuota;
+  clDates?: string[];
+  coDates?: string[];
+  slDates?: string[];
+  holidayDates?: string[];
+  lopDates?: string[];
+  sundayWorkDates?: string[];
+  holidayWorkDates?: string[];
 }
 
 export default function SalaryPage() {
@@ -71,13 +93,26 @@ export default function SalaryPage() {
 
   const handleExport = () => {
     if (!data) return;
-    const headers = ["Name", "Monthly Salary", "Paid Days", "Deducted Days", "Working Hrs", "Earned", "Deductions", "Final Payable"];
+    const headers = [
+      "Name", "Designation", "Role", "Biometric ID", "Monthly Salary", 
+      "Paid Days", "Deducted Days", "Working Hrs", "Overtime (Hrs)", 
+      "Available CL", "Available CO", "CL Dates Taken", "LOP Dates", 
+      "Earned Salary", "Deductions", "Final Net Payable"
+    ];
     const rows = data.salary.map((s) => [
-      s.name, 
+      `"${s.name}"`, 
+      `"${s.designation || "-"}"`,
+      `"${s.role}"`,
+      `"${s.biometricId || "-"}"`,
       s.monthlySalary, 
       s.paidDays, 
       s.deductedDays, 
       s.totalWorkingHours, 
+      s.totalOvertimeHours || "0.0",
+      s.clBalance?.available ?? s.clDays,
+      s.coBalance?.available ?? s.coDays,
+      `"${(s.clDates || []).join(", ")}"`,
+      `"${(s.lopDates || []).join(", ")}"`,
       s.earnedSalary, 
       s.deductions, 
       s.finalPayableSalary
@@ -87,7 +122,7 @@ export default function SalaryPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `salary-${monthStr}.csv`;
+    a.download = `salary-report-${monthStr}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -118,7 +153,7 @@ export default function SalaryPage() {
     setPrintRecord(s);
     setTimeout(() => {
       window.print();
-    }, 150);
+    }, 200);
   };
 
   return (
@@ -139,18 +174,19 @@ export default function SalaryPage() {
               left: 0;
               top: 0;
               width: 100%;
-              background: white !important;
-              color: black !important;
+              margin: 0;
+              padding: 20px;
+              box-shadow: none !important;
               border: none !important;
-              padding: 0 !important;
             }
           }
         `}} />
 
+        {/* Page Header */}
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between print:hidden">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Salary Management</h1>
-            <p className="text-sm text-gray-500 mt-0.5">Automated payslips & leave calculations</p>
+            <p className="text-sm text-gray-500 mt-0.5">Automated payroll, leave quotas & detailed payslip generation</p>
           </div>
           <div className="flex flex-wrap gap-2">
             {isManager && (
@@ -164,7 +200,7 @@ export default function SalaryPage() {
               </button>
             )}
             <button onClick={handleExport} className="btn-secondary flex items-center gap-1.5">
-              <Download className="w-4.5 h-4.5" /> Export CSV
+              <Download className="w-4.5 h-4.5" /> Export Detailed CSV
             </button>
           </div>
         </motion.div>
@@ -172,86 +208,100 @@ export default function SalaryPage() {
         {/* Month selector */}
         <div className="card p-4 flex items-center justify-between print:hidden">
           <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-2 rounded-lg hover:bg-gray-100"><ChevronLeft className="w-5 h-5 text-gray-600" /></button>
-          <h2 className="text-lg font-semibold text-gray-900">{format(currentMonth, "MMMM yyyy")}</h2>
+          <div className="text-center">
+            <h2 className="text-lg font-bold text-gray-900">{format(currentMonth, "MMMM yyyy")}</h2>
+            <p className="text-xs text-gray-400 font-medium">Pay Period ({data?.totalDaysInMonth || 30} Days)</p>
+          </div>
           <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-2 rounded-lg hover:bg-gray-100"><ChevronRight className="w-5 h-5 text-gray-600" /></button>
         </div>
 
         {/* Salary Cards Grid */}
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 print:hidden">
-            {[...Array(3)].map((_, i) => <div key={i} className="h-64 rounded-2xl bg-white animate-pulse border border-gray-100" />)}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 print:hidden">
+            {[...Array(3)].map((_, i) => <div key={i} className="h-80 rounded-2xl bg-white animate-pulse border border-gray-100" />)}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 print:hidden">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 print:hidden">
             {data?.salary.map((s) => (
-              <motion.div key={s.userId} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="card p-5 flex flex-col justify-between">
+              <motion.div key={s.userId} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="card p-5 flex flex-col justify-between hover:shadow-md transition-shadow">
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
-                        <span className="text-sm font-semibold text-blue-600">{s.name.charAt(0)}</span>
+                      <div className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center border border-blue-100">
+                        <span className="text-base font-bold text-blue-600">{s.name.charAt(0)}</span>
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-gray-900">{s.name}</p>
+                        <p className="text-sm font-bold text-gray-900">{s.name}</p>
                         <p className="text-xs text-gray-500">{s.designation || s.role}</p>
+                        {s.biometricId && <p className="text-[10px] text-blue-500 font-medium">Bio ID: #{s.biometricId}</p>}
                       </div>
                     </div>
                     <button 
                       onClick={() => handlePrintPayslip(s)}
-                      className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500" 
-                      title="Download PDF Payslip"
+                      className="p-2 rounded-xl bg-gray-50 hover:bg-blue-50 text-gray-600 hover:text-blue-600 transition-colors border border-gray-100" 
+                      title="Download / Print Detailed Payslip"
                     >
-                      <Printer className="w-4.5 h-4.5" />
+                      <Printer className="w-4 h-4" />
                     </button>
                   </div>
 
                   {/* Quotas & Attendance Details */}
-                  <div className="space-y-1.5 text-xs border-b border-gray-100 pb-3 mb-3">
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Paid Days:</span>
-                      <span className="font-semibold text-emerald-600">{s.paidDays} day(s)</span>
+                  <div className="space-y-1.5 text-xs border-b border-gray-100 pb-3 mb-3 bg-gray-50/50 p-3 rounded-xl">
+                    <div className="flex justify-between font-semibold">
+                      <span className="text-gray-600">Total Paid Days:</span>
+                      <span className="text-emerald-600 font-bold">{s.paidDays} / {data.totalDaysInMonth} days</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400 pl-3">Present (Full / Half):</span>
-                      <span className="font-medium text-gray-600">{s.presentDays} / {s.halfDays}</span>
+                    <div className="flex justify-between text-gray-500">
+                      <span>Working Hours / OT:</span>
+                      <span className="font-medium text-gray-800">{s.totalWorkingHours}h | {s.totalOvertimeHours || "0.0"}h OT</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400 pl-3">Week Off (WO):</span>
-                      <span className="font-medium text-gray-600">{s.woDays}</span>
+                    <div className="flex justify-between text-gray-500">
+                      <span>Casual Leave (CL) Balance:</span>
+                      <span className="font-semibold text-purple-700">{s.clBalance?.available ?? s.clDays} Days left</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400 pl-3">Approved Leaves (CL / SL / CO / H):</span>
-                      <span className="font-medium text-purple-600">{s.clDays} / {s.slDays} / {s.coDays} / {s.holidayDays}</span>
+                    <div className="flex justify-between text-gray-500">
+                      <span>Comp Off (CO) Balance:</span>
+                      <span className="font-semibold text-indigo-700">{s.coBalance?.available ?? s.coDays} Days earned</span>
                     </div>
-                    <div className="flex justify-between pt-1 border-t border-gray-50">
-                      <span className="text-gray-500">Deducted Days (LOP / Absent):</span>
-                      <span className="font-semibold text-red-600">{s.deductedDays} day(s)</span>
-                    </div>
+                    {s.deductedDays > 0 && (
+                      <div className="flex justify-between pt-1 border-t border-gray-200/60 text-red-600 font-semibold">
+                        <span>LOP / Deducted Days:</span>
+                        <span>{s.deductedDays} day(s)</span>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="space-y-2 mb-4 text-xs">
+                  {/* Financial Breakdown */}
+                  <div className="space-y-1.5 mb-4 text-xs">
                     <div className="flex justify-between">
                       <span className="text-gray-500">Gross Monthly Salary</span>
-                      <span className="font-medium text-gray-900">₹{parseFloat(s.monthlySalary).toLocaleString()}</span>
+                      <span className="font-medium text-gray-900">₹{parseFloat(s.monthlySalary).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Daily Salary Rate</span>
-                      <span className="font-medium text-gray-700">₹{parseFloat(s.dailySalary).toLocaleString()}</span>
+                      <span className="text-gray-500">Daily Rate</span>
+                      <span className="font-medium text-gray-700">₹{parseFloat(s.dailySalary).toLocaleString("en-IN", { minimumFractionDigits: 2 })} / day</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Deductions (LOP & Absences)</span>
-                      <span className="font-semibold text-red-600">-₹{parseFloat(s.deductions).toLocaleString()}</span>
-                    </div>
+                    {parseFloat(s.deductions) > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-red-500">LOP Deductions ({s.deductedDays}d)</span>
+                        <span className="font-bold text-red-600">-₹{parseFloat(s.deductions).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 <div className="border-t border-gray-100 pt-3 mt-auto">
                   <div className="flex justify-between items-center">
                     <div>
-                      <p className="text-[10px] text-gray-400 uppercase font-semibold">Net Payable</p>
-                      <p className="text-lg font-bold text-blue-600">₹{parseFloat(s.finalPayableSalary).toLocaleString()}</p>
+                      <p className="text-[10px] text-gray-400 uppercase font-semibold">Net Payable Salary</p>
+                      <p className="text-lg font-extrabold text-blue-600">₹{parseFloat(s.finalPayableSalary).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p>
                     </div>
-                    <span className="badge badge-neutral text-xs">{s.totalWorkingHours} hrs worked</span>
+                    <button 
+                      onClick={() => handlePrintPayslip(s)} 
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 px-3 py-1.5 rounded-lg"
+                    >
+                      View Payslip
+                    </button>
                   </div>
                 </div>
               </motion.div>
@@ -259,82 +309,213 @@ export default function SalaryPage() {
           </div>
         )}
 
-        {/* Hidden Print Section: Beautiful Invoice-Style Payslip */}
+        {/* High-End Corporate Printable Payslip */}
         {printRecord && (
-          <div id="print-section" className="hidden print:block bg-white p-8 max-w-xl mx-auto border border-gray-300 rounded-2xl shadow-sm">
-            <div className="text-center mb-6">
-              <img src="/logo.png" alt="Company Logo" className="h-16 mx-auto mb-2" />
-              <h2 className="text-xl font-bold text-gray-900">Four Dee Motion Picture</h2>
-              <p className="text-xs text-gray-500 font-semibold tracking-wider uppercase mt-1">Monthly Salary Payslip</p>
-              <p className="text-xs text-gray-400 mt-0.5">Pay Period: {format(currentMonth, "MMMM yyyy")}</p>
+          <div id="print-section" className="hidden print:block bg-white p-8 max-w-2xl mx-auto border border-gray-300 rounded-2xl shadow-sm text-gray-800">
+            
+            {/* Header with Logo */}
+            <div className="flex items-center justify-between border-b-2 border-blue-900/80 pb-4 mb-5">
+              <div className="flex items-center gap-3.5">
+                <img src="/logo.png" alt="Company Logo" className="h-16 w-auto object-contain" />
+                <div>
+                  <h2 className="text-2xl font-black text-gray-900 tracking-tight">Four Dee Motion Picture</h2>
+                  <p className="text-xs text-gray-500 font-medium">Office ERP & Employee Payroll System</p>
+                  <p className="text-[10px] text-gray-400">teamsimran.in • Chennai, Tamil Nadu</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="inline-block bg-blue-900 text-white text-[11px] font-bold px-3 py-1 rounded-md uppercase tracking-wider mb-1">
+                  Salary Payslip
+                </span>
+                <p className="text-xs font-bold text-gray-800">Pay Period: {format(currentMonth, "MMMM yyyy")}</p>
+                <p className="text-[10px] text-gray-400">Ref: FD-PAY-{format(currentMonth, "yyyyMM")}-{printRecord.userId.slice(0, 5).toUpperCase()}</p>
+              </div>
             </div>
-            
-            <hr className="border-gray-200 my-4"/>
-            
-            <table className="w-full text-sm text-gray-700 mb-6">
-              <tbody>
-                <tr>
-                  <td className="py-1 font-bold w-1/3">Employee Name:</td>
-                  <td className="py-1">{printRecord.name}</td>
-                </tr>
-                <tr>
-                  <td className="py-1 font-bold">Designation:</td>
-                  <td className="py-1">{printRecord.designation || "-"}</td>
-                </tr>
-                <tr>
-                  <td className="py-1 font-bold">Role:</td>
-                  <td className="py-1 capitalize">{printRecord.role.replace("_", " ")}</td>
-                </tr>
-                <tr>
-                  <td className="py-1 font-bold">Payment Mode:</td>
-                  <td className="py-1">Bank Transfer</td>
-                </tr>
-              </tbody>
-            </table>
 
-            <h4 className="text-xs font-bold uppercase text-gray-500 mb-2">Attendance Summary</h4>
-            <table className="w-full border border-gray-200 text-xs text-center border-collapse mb-6">
+            {/* Employee Meta Details Card */}
+            <div className="bg-gray-50/80 border border-gray-200 rounded-xl p-4 mb-5 grid grid-cols-2 gap-y-2 text-xs">
+              <div>
+                <span className="text-gray-400 font-medium">Employee Name:</span>
+                <p className="font-bold text-gray-900 text-sm">{printRecord.name}</p>
+              </div>
+              <div>
+                <span className="text-gray-400 font-medium">Official / Personal Email:</span>
+                <p className="font-semibold text-gray-800 truncate">{printRecord.personalEmail || printRecord.email || "-"}</p>
+              </div>
+              <div>
+                <span className="text-gray-400 font-medium">Designation:</span>
+                <p className="font-semibold text-gray-800">{printRecord.designation || "-"}</p>
+              </div>
+              <div>
+                <span className="text-gray-400 font-medium">Phone / Contact:</span>
+                <p className="font-semibold text-gray-800">{printRecord.phone || "-"}</p>
+              </div>
+              <div>
+                <span className="text-gray-400 font-medium">Department / Role:</span>
+                <p className="font-semibold text-gray-800 capitalize">{printRecord.role.replace("_", " ")}</p>
+              </div>
+              <div>
+                <span className="text-gray-400 font-medium">Biometric ID & Payment Mode:</span>
+                <p className="font-semibold text-gray-800">{printRecord.biometricId ? `#${printRecord.biometricId}` : "Standard"} • Direct Bank Transfer</p>
+              </div>
+            </div>
+
+            {/* 4-Stat Metric Grid */}
+            <div className="grid grid-cols-4 gap-2 text-center mb-5">
+              <div className="p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/40">
+                <span className="text-[10px] font-semibold text-emerald-800 uppercase block">Total Paid Days</span>
+                <span className="text-base font-extrabold text-emerald-700">{printRecord.paidDays} / {data?.totalDaysInMonth || 30}</span>
+              </div>
+              <div className="p-2.5 rounded-xl border border-blue-200 bg-blue-50/40">
+                <span className="text-[10px] font-semibold text-blue-800 uppercase block">Total Hours</span>
+                <span className="text-base font-extrabold text-blue-700">{printRecord.totalWorkingHours} hrs</span>
+              </div>
+              <div className="p-2.5 rounded-xl border border-purple-200 bg-purple-50/40">
+                <span className="text-[10px] font-semibold text-purple-800 uppercase block">Overtime</span>
+                <span className="text-base font-extrabold text-purple-700">{printRecord.totalOvertimeHours || "0.0"} hrs</span>
+              </div>
+              <div className="p-2.5 rounded-xl border border-gray-200 bg-gray-50/60">
+                <span className="text-[10px] font-semibold text-gray-700 uppercase block">Late Time</span>
+                <span className="text-base font-extrabold text-gray-800">{printRecord.totalLateMinutes || 0} mins</span>
+              </div>
+            </div>
+
+            {/* Leave & Quota Balances Detailed Breakdown */}
+            <div className="border border-purple-200 bg-purple-50/25 rounded-xl p-3.5 mb-5 text-xs">
+              <h4 className="font-bold text-purple-950 text-xs uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-purple-700" />
+                Leave Accruals & Balance Quotas
+              </h4>
+              <div className="grid grid-cols-2 gap-4 pb-2 border-b border-purple-100">
+                <div>
+                  <span className="text-gray-500 font-medium">Casual Leave (CL):</span>
+                  <p className="font-bold text-purple-900 text-sm">
+                    {printRecord.clBalance?.available ?? printRecord.clDays} Days Available
+                    <span className="text-[10px] font-normal text-gray-500 block">
+                      (Accrued: {printRecord.clBalance?.accrued ?? 0} | Used: {printRecord.clBalance?.used ?? 0})
+                    </span>
+                  </p>
+                </div>
+                <div>
+                  <span className="text-gray-500 font-medium">Comp Off (CO) Balance:</span>
+                  <p className="font-bold text-indigo-900 text-sm">
+                    {printRecord.coBalance?.available ?? printRecord.coDays} Days Available
+                    <span className="text-[10px] font-normal text-gray-500 block">
+                      (Earned from Holidays/Sundays: {printRecord.coBalance?.accrued ?? 0})
+                    </span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Leave Activity Details this Month */}
+              <div className="mt-2.5 space-y-1 text-[11px]">
+                {printRecord.clDates && printRecord.clDates.length > 0 && (
+                  <p className="text-gray-700">
+                    <b className="text-purple-900">CL Taken this month:</b> {printRecord.clDates.join(", ")}
+                  </p>
+                )}
+                {printRecord.holidayDates && printRecord.holidayDates.length > 0 && (
+                  <p className="text-gray-700">
+                    <b className="text-amber-900">Official Paid Holidays:</b> {printRecord.holidayDates.join(", ")}
+                  </p>
+                )}
+                {(printRecord.sundayWorkDates?.length || printRecord.holidayWorkDates?.length) ? (
+                  <p className="text-gray-700">
+                    <b className="text-indigo-900">Weekend / Holiday Work:</b> {[...(printRecord.sundayWorkDates || []), ...(printRecord.holidayWorkDates || [])].join(", ")}
+                  </p>
+                ) : null}
+                {printRecord.lopDates && printRecord.lopDates.length > 0 && (
+                  <p className="text-red-700">
+                    <b className="text-red-900">Loss of Pay (LOP) / Unpaid Absences:</b> {printRecord.lopDates.join(", ")} ({printRecord.deductedDays} days total)
+                  </p>
+                )}
+                {(!printRecord.clDates?.length && !printRecord.lopDates?.length) && (
+                  <p className="text-emerald-700 font-medium">✨ Full attendance maintained with zero unapproved absences this pay period.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Financial Calculations Table */}
+            <h4 className="text-xs font-bold uppercase tracking-wider text-gray-600 mb-2">Earnings & Deductions Summary</h4>
+            <table className="w-full border border-gray-200 text-xs border-collapse mb-5">
               <thead>
-                <tr className="bg-gray-50 font-bold border-b border-gray-200">
-                  <th className="p-2 border-r border-gray-200">Present</th>
-                  <th className="p-2 border-r border-gray-200">Week Off (WO)</th>
-                  <th className="p-2 border-r border-gray-200">Paid Leaves</th>
-                  <th className="p-2 border-r border-gray-200">LOP / Unpaid</th>
-                  <th className="p-2">Total Paid Days</th>
+                <tr className="bg-gray-100 font-bold border-b border-gray-200 text-gray-800">
+                  <th className="p-2.5 text-left w-1/2 border-r border-gray-200">Earnings & Allowances</th>
+                  <th className="p-2.5 text-left w-1/2">Deductions</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-gray-100">
                 <tr>
-                  <td className="p-2 border-r border-gray-200">{printRecord.presentDays + printRecord.halfDays * 0.5} day(s)</td>
-                  <td className="p-2 border-r border-gray-200">{printRecord.woDays} day(s)</td>
-                  <td className="p-2 border-r border-gray-200">{printRecord.clDays + printRecord.slDays + printRecord.coDays + printRecord.holidayDays} day(s)</td>
-                  <td className="p-2 border-r border-gray-200">{printRecord.lopDays + printRecord.absentDays + printRecord.halfDays * 0.5} day(s)</td>
-                  <td className="p-2 font-bold text-emerald-600">{printRecord.paidDays} day(s)</td>
+                  <td className="p-2.5 border-r border-gray-200 align-top space-y-1.5">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Basic Monthly Gross Salary:</span>
+                      <span className="font-semibold">₹{parseFloat(printRecord.monthlySalary).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex justify-between text-gray-500 text-[11px]">
+                      <span>Daily Pay Rate ({data?.totalDaysInMonth || 30} days):</span>
+                      <span>₹{parseFloat(printRecord.dailySalary).toLocaleString("en-IN", { minimumFractionDigits: 2 })} / day</span>
+                    </div>
+                    <div className="flex justify-between text-emerald-700 font-medium">
+                      <span>Paid Days Calculated ({printRecord.paidDays}d):</span>
+                      <span>₹{parseFloat(printRecord.earnedSalary).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  </td>
+                  <td className="p-2.5 align-top space-y-1.5">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Loss of Pay Deductions ({printRecord.deductedDays}d):</span>
+                      <span className="font-bold text-red-600">-₹{parseFloat(printRecord.deductions).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex justify-between text-gray-500 text-[11px]">
+                      <span>Other Statutory Deductions:</span>
+                      <span>₹0.00</span>
+                    </div>
+                  </td>
+                </tr>
+                <tr className="bg-gray-50/70 font-bold">
+                  <td className="p-2.5 border-r border-gray-200 flex justify-between">
+                    <span>Total Gross Earnings:</span>
+                    <span>₹{parseFloat(printRecord.monthlySalary).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                  </td>
+                  <td className="p-2.5 flex justify-between text-red-700">
+                    <span>Total Deductions:</span>
+                    <span>-₹{parseFloat(printRecord.deductions).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                  </td>
                 </tr>
               </tbody>
             </table>
 
-            <h4 className="text-xs font-bold uppercase text-gray-500 mb-2">Salary Calculations</h4>
-            <table className="w-full text-sm text-gray-700 mb-8 border-t border-b border-gray-100">
-              <tbody>
-                <tr className="border-b border-gray-100">
-                  <td className="py-2.5">Gross Monthly Salary:</td>
-                  <td className="py-2.5 text-right font-medium">₹{parseFloat(printRecord.monthlySalary).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
-                </tr>
-                <tr className="border-b border-gray-100">
-                  <td className="py-2.5 text-red-600 font-semibold">Deductions (LOP & Absences):</td>
-                  <td className="py-2.5 text-right text-red-600 font-bold">-₹{parseFloat(printRecord.deductions).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
-                </tr>
-                <tr className="bg-blue-50/50 font-bold text-base">
-                  <td className="p-3 text-blue-900">Net Payable Salary:</td>
-                  <td className="p-3 text-right text-blue-900 text-lg">₹{parseFloat(printRecord.finalPayableSalary).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
-                </tr>
-              </tbody>
-            </table>
+            {/* Net Salary Highlight Box */}
+            <div className="bg-blue-900 text-white rounded-xl p-4 mb-8 flex items-center justify-between">
+              <div>
+                <p className="text-[11px] uppercase tracking-wider text-blue-200 font-semibold">Net Payable Salary</p>
+                <p className="text-xs text-blue-100">Disbursed via Direct Bank Transfer</p>
+              </div>
+              <div className="text-right">
+                <p className="text-2xl font-black tracking-tight">₹{parseFloat(printRecord.finalPayableSalary).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p>
+              </div>
+            </div>
 
-            <div className="text-[10px] text-gray-400 text-center mt-12">
-              <p>This is a computer-generated payslip and does not require a physical signature.</p>
-              <p>© Four Dee Motion Picture ERP portal</p>
+            {/* Signatures & Verification */}
+            <div className="grid grid-cols-2 gap-10 pt-6 border-t border-gray-200 text-center text-xs">
+              <div>
+                <div className="h-10"></div>
+                <div className="border-t border-gray-400 pt-1">
+                  <p className="font-bold text-gray-900">Authorized Signatory</p>
+                  <p className="text-[10px] text-gray-400">Four Dee Motion Picture Management</p>
+                </div>
+              </div>
+              <div>
+                <div className="h-10"></div>
+                <div className="border-t border-gray-400 pt-1">
+                  <p className="font-bold text-gray-900">Employee Acknowledgment</p>
+                  <p className="text-[10px] text-gray-400">{printRecord.name}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="text-[9px] text-gray-400 text-center mt-6">
+              <p>This is an official computer-generated payroll document issued under Four Dee Motion Picture ERP.</p>
+              <p>© 2026 Four Dee Motion Picture. All rights reserved.</p>
             </div>
           </div>
         )}
