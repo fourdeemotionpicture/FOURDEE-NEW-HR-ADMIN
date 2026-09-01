@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 
 const SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "four-dee-erp-secret-key-2024-change-in-production");
-const COOKIE_NAME = "fd_erp_token";
+export const COOKIE_NAME = "fd_erp_token";
 
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 12);

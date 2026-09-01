@@ -11,9 +11,11 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const user = await db.query.users.findFirst({
-      where: eq(users.id, currentUser.userId),
-    });
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, currentUser.userId))
+      .limit(1);
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
@@ -28,8 +30,8 @@ export async function GET() {
       monthlySalary: user.monthlySalary,
       isActive: user.isActive,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Me error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json({ error: error?.message || "Internal server error" }, { status: 500 });
   }
 }
