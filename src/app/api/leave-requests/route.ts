@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/db";
 import { leaveRequests, attendance, users } from "@/db/schema";
-import { eq, and, gte, lte, desc, inArray } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { format, parseISO, eachDayOfInterval, getDay } from "date-fns";
 import { sendEmail } from "@/lib/email";
 import { getUserLeaveBalances } from "@/lib/leave-balances";
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { startDate, endDate, type, reason } = body;
+    const { startDate, endDate, type, reason, isHalfDay = false } = body;
 
     if (!startDate || !endDate || !type) {
       return NextResponse.json({ error: "Start date, end date, and type are required" }, { status: 400 });
@@ -75,26 +75,31 @@ export async function POST(request: NextRequest) {
     const start = parseISO(startDate);
     const end = parseISO(endDate);
     const daysInterval = eachDayOfInterval({ start, end });
-    const requestedDays = daysInterval.filter((d) => getDay(d) !== 0).length; // Exclude Sundays
+    const fullDaysCount = daysInterval.filter((d) => getDay(d) !== 0).length; // Exclude Sundays
 
-    if (requestedDays <= 0) {
+    if (fullDaysCount <= 0) {
       return NextResponse.json({ error: "Selected dates fall entirely on Sunday (Week Off)" }, { status: 400 });
     }
+
+    const effectiveRequestedDays = isHalfDay ? 0.5 : fullDaysCount;
 
     const isAdmin = currentUser.role === "super_admin" || currentUser.role === "owner_admin";
     let status = "pending";
 
     const balances = await getUserLeaveBalances(currentUser.userId);
 
+    // Leave Type Tag
+    const leaveTypeToSave = isHalfDay && type === "CL" ? "HD_CL" : type;
+
     // Quota validation for CL & CO
-    if (type === "CL" && !isAdmin) {
+    if ((type === "CL" || leaveTypeToSave === "HD_CL") && !isAdmin) {
       // Auto-approve if they have sufficient CL quota left
-      if (balances.clBalance.available >= requestedDays) {
+      if (balances.clBalance.available >= effectiveRequestedDays) {
         status = "approved";
       }
     } else if (type === "CO" && !isAdmin) {
       // Auto-approve if they have sufficient Comp Off (CO) balance earned from Holidays/Sundays
-      if (balances.coBalance.available >= requestedDays) {
+      if (balances.coBalance.available >= effectiveRequestedDays) {
         status = "approved";
       }
     } else if (isAdmin) {
@@ -107,45 +112,65 @@ export async function POST(request: NextRequest) {
       userId: currentUser.userId,
       startDate,
       endDate,
-      type,
-      reason: reason || null,
+      type: leaveTypeToSave,
+      reason: reason ? `${isHalfDay ? "[Half Day 0.5 CL] " : ""}${reason}` : (isHalfDay ? "Half Day 0.5 CL applied" : null),
       status,
       updatedAt: new Date(),
     }).returning();
 
-    // If approved, create attendance entries for each day (excluding Sundays)
+    // If approved, create/update attendance entries
     if (status === "approved") {
       for (const day of daysInterval) {
-        // Skip Sundays as they are Week Off (WO)
-        if (getDay(day) === 0) continue;
+        if (getDay(day) === 0) continue; // Skip Sundays
 
         const dateStr = format(day, "yyyy-MM-dd");
 
-        // Upsert attendance record
         const existing = await db.select().from(attendance).where(
           and(eq(attendance.userId, currentUser.userId), eq(attendance.date, dateStr))
         );
 
-        if (existing.length > 0) {
-          await db.update(attendance).set({
-            status: type, // CL, SL, CO, H
-            source: "manual",
-            inTime: null,
-            outTime: null,
-            workingHours: "0.00",
-            lateMinutes: 0,
-            overtimeMinutes: 0,
-            notes: `Leave Auto-Approved (${type}): ${reason || ""}`,
-            updatedAt: new Date(),
-          }).where(eq(attendance.id, existing[0].id));
+        if (leaveTypeToSave === "HD_CL") {
+          // Half Day + 0.5 CL applied
+          if (existing.length > 0) {
+            await db.update(attendance).set({
+              status: "HD_CL",
+              source: existing[0].source || "manual",
+              notes: `Half Day + 0.5 CL Applied: ${reason || ""}`,
+              updatedAt: new Date(),
+            }).where(eq(attendance.id, existing[0].id));
+          } else {
+            await db.insert(attendance).values({
+              userId: currentUser.userId,
+              date: dateStr,
+              status: "HD_CL",
+              source: "manual",
+              workingHours: "4.00",
+              notes: `Half Day + 0.5 CL Applied: ${reason || ""}`,
+            });
+          }
         } else {
-          await db.insert(attendance).values({
-            userId: currentUser.userId,
-            date: dateStr,
-            status: type,
-            source: "manual",
-            notes: `Leave Auto-Approved (${type}): ${reason || ""}`,
-          });
+          // Full Day Leave
+          if (existing.length > 0) {
+            await db.update(attendance).set({
+              status: type, // CL, SL, CO, H
+              source: "manual",
+              inTime: null,
+              outTime: null,
+              workingHours: "0.00",
+              lateMinutes: 0,
+              overtimeMinutes: 0,
+              notes: `Leave Auto-Approved (${type}): ${reason || ""}`,
+              updatedAt: new Date(),
+            }).where(eq(attendance.id, existing[0].id));
+          } else {
+            await db.insert(attendance).values({
+              userId: currentUser.userId,
+              date: dateStr,
+              status: type,
+              source: "manual",
+              notes: `Leave Auto-Approved (${type}): ${reason || ""}`,
+            });
+          }
         }
       }
     }
@@ -162,8 +187,8 @@ export async function POST(request: NextRequest) {
           subject: `New Leave Request from ${empUser.name}`,
           html: `<h3>New Leave Request Pending Approval</h3>
                  <p><b>Employee:</b> ${empUser.name}</p>
-                 <p><b>Type:</b> ${type}</p>
-                 <p><b>Dates:</b> ${startDate} to ${endDate} (${requestedDays} working day(s))</p>
+                 <p><b>Type:</b> ${leaveTypeToSave} (${effectiveRequestedDays} day(s))</p>
+                 <p><b>Dates:</b> ${startDate} to ${endDate}</p>
                  <p><b>Reason:</b> ${reason || "Not specified"}</p>
                  <p>Please log in to the HR Portal to approve or reject this request.</p>`,
         });
@@ -212,8 +237,7 @@ export async function PATCH(request: NextRequest) {
       const daysInterval = eachDayOfInterval({ start, end });
 
       for (const day of daysInterval) {
-        // Skip Sundays
-        if (getDay(day) === 0) continue;
+        if (getDay(day) === 0) continue; // Skip Sundays
 
         const dateStr = format(day, "yyyy-MM-dd");
 
@@ -221,26 +245,45 @@ export async function PATCH(request: NextRequest) {
           and(eq(attendance.userId, leaveReq.userId), eq(attendance.date, dateStr))
         );
 
-        if (existing.length > 0) {
-          await db.update(attendance).set({
-            status: leaveReq.type,
-            source: "manual",
-            inTime: null,
-            outTime: null,
-            workingHours: "0.00",
-            lateMinutes: 0,
-            overtimeMinutes: 0,
-            notes: `Leave Approved: ${leaveReq.type} - ${leaveReq.reason || ""}`,
-            updatedAt: new Date(),
-          }).where(eq(attendance.id, existing[0].id));
+        if (leaveReq.type === "HD_CL") {
+          if (existing.length > 0) {
+            await db.update(attendance).set({
+              status: "HD_CL",
+              notes: `Half Day + 0.5 CL Approved: ${leaveReq.reason || ""}`,
+              updatedAt: new Date(),
+            }).where(eq(attendance.id, existing[0].id));
+          } else {
+            await db.insert(attendance).values({
+              userId: leaveReq.userId,
+              date: dateStr,
+              status: "HD_CL",
+              source: "manual",
+              workingHours: "4.00",
+              notes: `Half Day + 0.5 CL Approved: ${leaveReq.reason || ""}`,
+            });
+          }
         } else {
-          await db.insert(attendance).values({
-            userId: leaveReq.userId,
-            date: dateStr,
-            status: leaveReq.type,
-            source: "manual",
-            notes: `Leave Approved: ${leaveReq.type} - ${leaveReq.reason || ""}`,
-          });
+          if (existing.length > 0) {
+            await db.update(attendance).set({
+              status: leaveReq.type,
+              source: "manual",
+              inTime: null,
+              outTime: null,
+              workingHours: "0.00",
+              lateMinutes: 0,
+              overtimeMinutes: 0,
+              notes: `Leave Approved: ${leaveReq.type} - ${leaveReq.reason || ""}`,
+              updatedAt: new Date(),
+            }).where(eq(attendance.id, existing[0].id));
+          } else {
+            await db.insert(attendance).values({
+              userId: leaveReq.userId,
+              date: dateStr,
+              status: leaveReq.type,
+              source: "manual",
+              notes: `Leave Approved: ${leaveReq.type} - ${leaveReq.reason || ""}`,
+            });
+          }
         }
       }
     }

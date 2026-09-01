@@ -115,6 +115,16 @@ export async function POST(request: NextRequest) {
           } else if (status === "H") {
             holidayCount++;
             paidDays += 1.0;
+          } else if (status === "WO_PRESENT") {
+            presentCount++;
+            paidDays += 1.0;
+          } else if (status === "H_PRESENT") {
+            presentCount++;
+            paidDays += 1.0;
+          } else if (status === "HD_CL" || status === "half_day_cl") {
+            halfDayCount++;
+            clCount += 0.5;
+            paidDays += 1.0;
           } else if (status === "LOP") {
             lopCount++;
             deductedDays += 1.0;

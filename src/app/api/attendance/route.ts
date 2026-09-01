@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/db";
-import { attendance, users, auditLogs } from "@/db/schema";
+import { attendance, users, auditLogs, holidays } from "@/db/schema";
 import { eq, and, gte, lte } from "drizzle-orm";
-import { format, startOfMonth, endOfMonth, differenceInMinutes, parse } from "date-fns";
+import { format, startOfMonth, endOfMonth, differenceInMinutes, parse, getDay, parseISO } from "date-fns";
 
 // Office timing constants
 const OFFICE_START = "10:00";
@@ -29,7 +29,7 @@ export function calculateAttendance(inTime: string, outTime: string) {
   } else {
     // Less than 8 hours: status is half_day
     status = "half_day";
-    // Check if check-in time is 10:15 AM or later (i.e. lateMinutes applies from 10:00 AM)
+    // Check if check-in time is 10:15 AM or later
     const inHours = inDate.getHours();
     const inMins = inDate.getMinutes();
     const inTotalMins = inHours * 60 + inMins;
@@ -76,14 +76,43 @@ export async function GET(request: NextRequest) {
       attendanceRecords = attendanceRecords.filter((a) => a.userId === userId);
     }
 
-    // Enrich with user names
+    // Fetch official holidays
+    const officialHolidays = await db.select({ date: holidays.date, name: holidays.name }).from(holidays);
+    const holidayDateMap = new Map(officialHolidays.map((h) => [h.date, h.name]));
+
+    // Enrich with user names and dual status flags (WO+PRESENT, H+PRESENT)
     const allUsers = await db.select({ id: users.id, name: users.name }).from(users);
     const userMap = Object.fromEntries(allUsers.map((u) => [u.id, u.name]));
 
-    const enriched = attendanceRecords.map((a) => ({
-      ...a,
-      userName: userMap[a.userId] || "Unknown",
-    }));
+    const enriched = attendanceRecords.map((a) => {
+      let finalStatus = a.status;
+      const hasWorkLog = 
+        a.status === "present" || 
+        a.status === "half_day" || 
+        a.status === "WO_PRESENT" || 
+        a.status === "H_PRESENT" || 
+        (a.workingHours && parseFloat(a.workingHours) > 0) || 
+        (a.inTime && a.outTime);
+
+      const recordDate = parseISO(a.date);
+      const isSunday = getDay(recordDate) === 0;
+      const isHoliday = holidayDateMap.has(a.date);
+
+      if (hasWorkLog && isSunday && finalStatus !== "HD_CL") {
+        finalStatus = "WO_PRESENT";
+      } else if (hasWorkLog && isHoliday && finalStatus !== "HD_CL") {
+        finalStatus = "H_PRESENT";
+      }
+
+      return {
+        ...a,
+        status: finalStatus,
+        userName: userMap[a.userId] || "Unknown",
+        isSunday,
+        isHoliday,
+        holidayName: holidayDateMap.get(a.date) || null,
+      };
+    });
 
     return NextResponse.json({ attendance: enriched });
   } catch (error) {
@@ -110,7 +139,7 @@ export async function POST(request: NextRequest) {
     const canOverride = currentUser.role === "super_admin" || currentUser.role === "owner_admin";
 
     // Determine if setting a leave or week off status
-    const leaveStatuses = ["WO", "CL", "SL", "CO", "LOP", "H", "absent"];
+    const leaveStatuses = ["WO", "CL", "SL", "CO", "LOP", "H", "absent", "HD_CL"];
     const isLeaveStatus = status && leaveStatuses.includes(status);
 
     if (!isLeaveStatus && (!inTime || !outTime)) {
@@ -119,15 +148,12 @@ export async function POST(request: NextRequest) {
 
     // Validation rules for manual attendance (non-admin)
     if (source === "manual" && !canOverride) {
-      // Cannot submit for future dates
       if (date > today) {
         return NextResponse.json({ error: "Cannot submit attendance for future dates" }, { status: 400 });
       }
-      // Cannot submit for previous dates (non-admin)
       if (date < today) {
         return NextResponse.json({ error: "Cannot submit attendance for previous dates" }, { status: 400 });
       }
-      // One entry per day
       const existing = await db.select().from(attendance).where(
         and(eq(attendance.userId, currentUser.userId), eq(attendance.date, date))
       );
@@ -143,66 +169,67 @@ export async function POST(request: NextRequest) {
     let overtimeMinutes = 0;
     let finalStatus = status || "present";
 
-    if (!isLeaveStatus) {
+    if (inTime && outTime) {
       cleanInTime = inTime.slice(0, 5);
       cleanOutTime = outTime.slice(0, 5);
       const calculations = calculateAttendance(cleanInTime, cleanOutTime);
       workingHours = calculations.workingHours;
       lateMinutes = calculations.lateMinutes;
       overtimeMinutes = calculations.overtimeMinutes;
-      finalStatus = status || calculations.status;
+      if (!isLeaveStatus && !["WO_PRESENT", "H_PRESENT"].includes(status)) {
+        finalStatus = calculations.status;
+      }
+    }
+
+    // Preserve special statuses if explicitly selected
+    if (["WO_PRESENT", "H_PRESENT", "HD_CL", "WO", "CL", "SL", "CO", "LOP", "H", "absent", "half_day"].includes(status)) {
+      finalStatus = status;
     }
 
     const targetUserId = canOverride && userId ? userId : currentUser.userId;
 
-    // Check if attendance already exists
     const existing = await db.select().from(attendance).where(
       and(eq(attendance.userId, targetUserId), eq(attendance.date, date))
     );
 
+    let result;
     if (existing.length > 0) {
-      // Update existing
-      const [updated] = await db.update(attendance).set({
+      [result] = await db.update(attendance).set({
         inTime: cleanInTime,
         outTime: cleanOutTime,
-        workingHours: workingHours,
-        lateMinutes: lateMinutes,
-        overtimeMinutes: overtimeMinutes,
+        workingHours,
+        lateMinutes,
+        overtimeMinutes,
+        status: finalStatus,
+        source: source || "manual",
+        notes: notes ?? existing[0].notes,
+        updatedAt: new Date(),
+      }).where(eq(attendance.id, existing[0].id)).returning();
+    } else {
+      [result] = await db.insert(attendance).values({
+        userId: targetUserId,
+        date,
+        inTime: cleanInTime,
+        outTime: cleanOutTime,
+        workingHours,
+        lateMinutes,
+        overtimeMinutes,
         status: finalStatus,
         source: source || "manual",
         notes: notes || null,
-        updatedAt: new Date(),
-      }).where(eq(attendance.id, existing[0].id)).returning();
-
-      // Audit log for admin override
-      if (canOverride) {
-        await db.insert(auditLogs).values({
-          userId: currentUser.userId,
-          action: "attendance_override",
-          entity: "attendance",
-          entityId: updated.id,
-          details: { targetUserId, date, inTime: cleanInTime, outTime: cleanOutTime, status: finalStatus },
-        });
-      }
-
-      return NextResponse.json({ attendance: updated });
+      }).returning();
     }
 
-    // Create new
-    const [record] = await db.insert(attendance).values({
-      userId: targetUserId,
-      date,
-      inTime: cleanInTime,
-      outTime: cleanOutTime,
-      workingHours: workingHours,
-      lateMinutes: lateMinutes,
-      overtimeMinutes: overtimeMinutes,
-      status: finalStatus,
-      source: source || "manual",
-      notes: notes || null,
-    }).returning();
+    // Audit log
+    await db.insert(auditLogs).values({
+      userId: currentUser.userId,
+      action: existing.length > 0 ? "update" : "create",
+      entity: "attendance",
+      entityId: result.id,
+      details: { targetUserId, date, status: finalStatus, workingHours, source },
+    });
 
-    return NextResponse.json({ attendance: record });
+    return NextResponse.json({ attendance: result });
   } catch (error) {
     console.error("Attendance POST error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

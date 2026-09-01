@@ -34,16 +34,19 @@ interface LeaveRequest {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  present: "bg-emerald-50 text-emerald-700 border-emerald-100",
-  absent: "bg-red-50 text-red-700 border-red-100",
-  half_day: "bg-amber-50 text-amber-700 border-amber-100",
-  holiday: "bg-blue-50 text-blue-700 border-blue-100",
-  WO: "bg-gray-50 text-gray-600 border-gray-100",
-  CL: "bg-purple-50 text-purple-700 border-purple-100",
-  SL: "bg-pink-50 text-pink-700 border-pink-100",
-  CO: "bg-indigo-50 text-indigo-700 border-indigo-100",
-  LOP: "bg-orange-50 text-orange-700 border-orange-100",
-  H: "bg-sky-50 text-sky-700 border-sky-100",
+  present: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  absent: "bg-red-50 text-red-700 border-red-200",
+  half_day: "bg-amber-50 text-amber-700 border-amber-200",
+  holiday: "bg-blue-50 text-blue-700 border-blue-200",
+  WO: "bg-gray-50 text-gray-600 border-gray-200",
+  WO_PRESENT: "bg-emerald-50 text-emerald-800 border-emerald-300",
+  H_PRESENT: "bg-amber-100 text-amber-900 border-amber-300",
+  HD_CL: "bg-purple-100 text-purple-900 border-purple-300",
+  CL: "bg-purple-50 text-purple-700 border-purple-200",
+  SL: "bg-pink-50 text-pink-700 border-pink-200",
+  CO: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  LOP: "bg-orange-50 text-orange-700 border-orange-200",
+  H: "bg-sky-50 text-sky-700 border-sky-200",
 };
 
 export default function AttendancePage() {
@@ -61,6 +64,7 @@ export default function AttendancePage() {
   
   const [form, setForm] = useState({ userId: "", date: "", inTime: "", outTime: "", notes: "", status: "present" });
   const [leaveForm, setLeaveForm] = useState({ startDate: "", endDate: "", type: "CL", reason: "" });
+  const [isHalfDay, setIsHalfDay] = useState(false);
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [clBalance, setClBalance] = useState({ accrued: 0, used: 0, available: 0 });
   const [coBalance, setCoBalance] = useState({ accrued: 0, used: 0, available: 0 });
@@ -164,7 +168,7 @@ export default function AttendancePage() {
       const res = await fetch("/api/leave-requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(leaveForm),
+        body: JSON.stringify({ ...leaveForm, isHalfDay }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -173,6 +177,7 @@ export default function AttendancePage() {
       }
       setShowLeaveModal(false);
       setLeaveForm({ startDate: "", endDate: "", type: "CL", reason: "" });
+      setIsHalfDay(false);
       fetchData();
     } catch {
       alert("Network error. Please try again.");
@@ -206,13 +211,25 @@ export default function AttendancePage() {
     }
     
     const record = getRecordForDate(dateStr);
+    const holidayInfo = holidaysList.find((h) => h.date === dateStr);
+    const isSunday = getDay(day) === 0;
+
+    let defaultStatus = "present";
+    if (record?.status) {
+      defaultStatus = record.status;
+    } else if (isSunday) {
+      defaultStatus = "WO";
+    } else if (holidayInfo) {
+      defaultStatus = "H";
+    }
+
     setForm({
       userId: selectedEmployeeId || currentUser?.id || "",
       date: dateStr,
       inTime: record?.inTime || "10:00",
       outTime: record?.outTime || "18:00",
       notes: record?.notes || "",
-      status: record?.status || (getDay(day) === 0 ? "WO" : "present"),
+      status: defaultStatus,
     });
     setShowModal(true);
   };
@@ -389,9 +406,25 @@ export default function AttendancePage() {
                       <div className="flex items-center justify-between mb-1">
                         <span className={`text-xs font-medium ${isToday ? "text-blue-600 font-bold" : isSunday ? "text-gray-400" : "text-gray-700"}`}>{format(day, "d")}</span>
                         {record ? (
-                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${STATUS_COLORS[record.status] || "bg-gray-100 text-gray-700"}`}>
-                            {record.status.toUpperCase()}
-                          </span>
+                          record.status === "WO_PRESENT" ? (
+                            <div className="flex items-center gap-0.5">
+                              <span className="text-[8px] font-bold px-1 py-0.2 rounded border bg-gray-100 text-gray-600 border-gray-200">WO</span>
+                              <span className="text-[8px] font-bold px-1 py-0.2 rounded border bg-emerald-50 text-emerald-700 border-emerald-300">+ PRESENT</span>
+                            </div>
+                          ) : record.status === "H_PRESENT" ? (
+                            <div className="flex items-center gap-0.5">
+                              <span className="text-[8px] font-bold px-1 py-0.2 rounded border bg-amber-100 text-amber-800 border-amber-300">H</span>
+                              <span className="text-[8px] font-bold px-1 py-0.2 rounded border bg-emerald-50 text-emerald-700 border-emerald-300">+ PRESENT</span>
+                            </div>
+                          ) : record.status === "HD_CL" ? (
+                            <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full border bg-purple-100 text-purple-800 border-purple-300">
+                              HD + 0.5 CL
+                            </span>
+                          ) : (
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${STATUS_COLORS[record.status] || "bg-gray-100 text-gray-700"}`}>
+                              {record.status.toUpperCase()}
+                            </span>
+                          )
                         ) : holidayInfo ? (
                           <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full border bg-amber-100 text-amber-800 border-amber-200">H</span>
                         ) : isSunday ? (
@@ -402,6 +435,11 @@ export default function AttendancePage() {
                         <p className="text-[9px] font-semibold text-amber-800 truncate mb-0.5" title={holidayInfo.name}>
                           🎉 {holidayInfo.name}
                         </p>
+                      )}
+                      {(record?.status === "WO_PRESENT" || record?.status === "H_PRESENT") && (
+                        <span className="inline-block text-[8px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1 py-0.2 rounded mb-0.5">
+                          ⭐ +1 Comp Off
+                        </span>
                       )}
                       {record && (
                         <div className="space-y-0.5">
@@ -522,14 +560,17 @@ export default function AttendancePage() {
                     className="input-field font-semibold text-blue-600"
                   >
                     <option value="present">Present (Full Day)</option>
-                    <option value="half_day">Half Day</option>
-                    <option value="absent">Absent</option>
+                    <option value="half_day">Half Day (50% Day)</option>
+                    <option value="HD_CL">Half Day + 0.5 CL (Full Paid Day)</option>
+                    <option value="WO_PRESENT">Week Off + Present (WO + Present - Earns Comp Off)</option>
+                    <option value="H_PRESENT">Holiday + Present (H + Present - Earns Comp Off)</option>
                     <option value="WO">Week Off (WO)</option>
                     <option value="CL">Casual Leave (CL)</option>
                     <option value="SL">Sick Leave (SL)</option>
                     <option value="CO">Comp Off (CO)</option>
                     <option value="LOP">Loss of Pay (LOP)</option>
                     <option value="H">Holiday (H)</option>
+                    <option value="absent">Absent</option>
                   </select>
                 </div>
                 {!["WO", "CL", "SL", "CO", "LOP", "H", "absent"].includes(form.status) && (
@@ -579,15 +620,45 @@ export default function AttendancePage() {
                   </select>
                 </div>
 
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Leave Duration</label>
+                  <div className="grid grid-cols-2 gap-2 bg-gray-50 p-1.5 rounded-xl border border-gray-200">
+                    <button
+                      type="button"
+                      onClick={() => setIsHalfDay(false)}
+                      className={`py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                        !isHalfDay ? "bg-white text-blue-700 shadow-xs border border-gray-200" : "text-gray-500 hover:text-gray-800"
+                      }`}
+                    >
+                      Full Day (1.0 Day)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsHalfDay(true)}
+                      className={`py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                        isHalfDay ? "bg-white text-blue-700 shadow-xs border border-gray-200" : "text-gray-500 hover:text-gray-800"
+                      }`}
+                    >
+                      Half Day (0.5 CL)
+                    </button>
+                  </div>
+                </div>
+
                 {leaveForm.type === "CO" && (
                   <div className="p-2.5 rounded-lg bg-indigo-50 border border-indigo-100 text-xs text-indigo-800">
                     🏆 <b>Comp Off Balance:</b> You have <b>{coBalance.available}</b> day(s) available earned from working on public holidays or Sundays.
                   </div>
                 )}
 
-                {leaveForm.type === "CL" && (
+                {leaveForm.type === "CL" && !isHalfDay && (
                   <div className="p-2.5 rounded-lg bg-purple-50 border border-purple-100 text-xs text-purple-800">
                     ✨ <b>Casual Leave Balance:</b> You have <b>{clBalance.available}</b> day(s) left in your annual quota.
+                  </div>
+                )}
+
+                {leaveForm.type === "CL" && isHalfDay && (
+                  <div className="p-2.5 rounded-lg bg-purple-50 border border-purple-100 text-xs text-purple-800">
+                    ⚡ <b>Half Day 0.5 CL:</b> Deducts only <b>0.5 CL</b> from your balance ({clBalance.available} CL available) and converts your worked half day into <b>1.0 Full Paid Day</b> (No salary deduction / No LOP!).
                   </div>
                 )}
 
