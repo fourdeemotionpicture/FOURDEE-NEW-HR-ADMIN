@@ -115,7 +115,7 @@ export default function EmployeesPage() {
             <p className="text-sm text-gray-500 mt-0.5">Manage team members and access</p>
           </div>
           {userRole !== "owner_admin" && (
-            <button onClick={() => { setShowModal(true); setEditId(null); setForm({ name: "", email: "", password: "", role: "employee", designation: "", monthlySalary: "", dob: "", biometricId: "" }); }} className="btn-primary">
+            <button onClick={() => { setShowModal(true); setEditId(null); setForm({ name: "", email: "", personalEmail: "", phone: "", password: "", role: "employee", designation: "", monthlySalary: "", dob: "", biometricId: "" }); }} className="btn-primary">
               <UserPlus className="w-4.5 h-4.5" /> Add Employee
             </button>
           )}
