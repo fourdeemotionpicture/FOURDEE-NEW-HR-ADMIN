@@ -5,7 +5,7 @@ conn_str = "postgresql://postgres.psqpvochdmawlgatmmhn:FourDeeErp%402026%21@aws-
 holidays_list = [
     # 2026 Holidays
     ("Independence Day", "2026-08-15", "National Holiday", 2026),
-    ("Onam", "2026-08-27", "Festival Holiday", 2026),
+    ("Onam", "2026-08-26", "Festival Holiday", 2026),
     ("Vinayagar Chaturthi", "2026-09-14", "Festival Holiday", 2026),
     ("Ayudha Pooja", "2026-10-19", "Festival Holiday", 2026),
     ("Vijayadasami", "2026-10-20", "Festival Holiday", 2026),
