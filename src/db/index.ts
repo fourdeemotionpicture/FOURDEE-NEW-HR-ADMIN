@@ -4,29 +4,24 @@ import * as schema from "./schema";
 
 const databaseUrl = process.env.DATABASE_URL;
 
-const isBuildTime =
-  process.env.NEXT_PHASE === "phase-production-build" ||
-  process.env.CI === "true" ||
-  process.env.VERCEL === "1";
-
-if (!databaseUrl) {
-  if (isBuildTime) {
-    console.warn("⚠️ DATABASE_URL is not set at build time. Using placeholder connection string.");
-  } else {
-    throw new Error("DATABASE_URL is required at runtime.");
-  }
-}
-
-const connectionString = databaseUrl || "postgresql://postgres:postgres@127.0.0.1:5432/placeholder_db";
+const connectionString =
+  databaseUrl ||
+  "postgresql://postgres.psqpvochdmawlgatmmhn:FourDeeErp%402026%21@aws-0-ap-south-1.pooler.supabase.com:5432/postgres";
 
 const globalForDb = globalThis as typeof globalThis & {
   __arenaNextJsPostgresqlPool?: Pool;
 };
 
+const isLocal = connectionString.includes("localhost") || connectionString.includes("127.0.0.1");
+
 export const pool =
   globalForDb.__arenaNextJsPostgresqlPool ??
   new Pool({
     connectionString,
+    ssl: isLocal ? false : { rejectUnauthorized: false },
+    max: 10,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
   });
 
 if (process.env.NODE_ENV !== "production") {
