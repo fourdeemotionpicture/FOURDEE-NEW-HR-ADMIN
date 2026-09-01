@@ -39,7 +39,7 @@ const menuItems = [
   { label: "Work Reports", href: "/work-reports", icon: FileText, roles: ["super_admin", "owner_admin", "office_admin", "employee"] },
   { label: "Announcements", href: "/announcements", icon: Megaphone, roles: ["super_admin", "owner_admin", "office_admin", "employee"] },
   { label: "Expenses", href: "/expenses", icon: Receipt, roles: ["super_admin", "owner_admin", "office_admin"] },
-  { label: "Reports", href: "/reports", icon: BarChart3, roles: ["super_admin", "owner_admin"] },
+  { label: "Reports", href: "/reports", icon: BarChart3, roles: ["super_admin", "owner_admin", "office_admin", "employee"] },
   { label: "Fanpage Work", href: "/fanpage-work", icon: Share2, roles: ["super_admin", "owner_admin", "office_admin", "employee"] },
 ];
 
