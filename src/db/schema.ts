@@ -13,6 +13,8 @@ export const users = pgTable("users", {
   biometricId: integer("biometric_id").unique(),
   personalEmail: varchar("personal_email", { length: 255 }),
   phone: varchar("phone", { length: 50 }),
+  accountNumber: varchar("account_number", { length: 50 }),
+  ifscCode: varchar("ifsc_code", { length: 50 }),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

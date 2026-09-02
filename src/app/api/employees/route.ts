@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, hashPassword } from "@/lib/auth";
 import { db } from "@/db";
 import { users, auditLogs } from "@/db/schema";
-import { eq, ilike, or } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,33 +15,14 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || "";
     const role = searchParams.get("role") || "";
 
-    let query = db.select({
-      id: users.id,
-      name: users.name,
-      email: users.email,
-      role: users.role,
-      designation: users.designation,
-      monthlySalary: users.monthlySalary,
-      dob: users.dob,
-      biometricId: users.biometricId,
-      isActive: users.isActive,
-      createdAt: users.createdAt,
-    }).from(users);
-
-    const conditions = [];
-    if (search) {
-      conditions.push(or(ilike(users.name, `%${search}%`), ilike(users.email, `%${search}%`))!);
-    }
-    if (role) {
-      conditions.push(eq(users.role, role));
-    }
-
     const allUsers = await db.select({
       id: users.id,
       name: users.name,
       email: users.email,
       personalEmail: users.personalEmail,
       phone: users.phone,
+      accountNumber: users.accountNumber,
+      ifscCode: users.ifscCode,
       role: users.role,
       designation: users.designation,
       monthlySalary: users.monthlySalary,
@@ -51,13 +32,14 @@ export async function GET(request: NextRequest) {
       createdAt: users.createdAt,
     }).from(users);
 
-    // Apply filters in memory for simplicity
+    // Apply filters in memory
     let filtered = allUsers;
     if (search) {
       filtered = filtered.filter((u) =>
         u.name.toLowerCase().includes(search.toLowerCase()) ||
         u.email.toLowerCase().includes(search.toLowerCase()) ||
-        (u.personalEmail && u.personalEmail.toLowerCase().includes(search.toLowerCase()))
+        (u.personalEmail && u.personalEmail.toLowerCase().includes(search.toLowerCase())) ||
+        (u.phone && u.phone.includes(search))
       );
     }
     if (role) {
@@ -84,7 +66,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, email, personalEmail, phone, password, role, designation, monthlySalary, dob, biometricId } = body;
+    const { name, email, personalEmail, phone, accountNumber, ifscCode, password, role, designation, monthlySalary, dob, biometricId } = body;
 
     if (!name || !email || !password) {
       return NextResponse.json({ error: "Name, email, and password are required" }, { status: 400 });
@@ -97,6 +79,8 @@ export async function POST(request: NextRequest) {
       email: email.toLowerCase().trim(),
       personalEmail: personalEmail ? personalEmail.toLowerCase().trim() : null,
       phone: phone ? phone.trim() : null,
+      accountNumber: accountNumber ? accountNumber.trim() : null,
+      ifscCode: ifscCode ? ifscCode.trim().toUpperCase() : null,
       passwordHash,
       role: role || "employee",
       designation: designation || "",
@@ -134,7 +118,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { id, name, email, personalEmail, phone, role, designation, monthlySalary, isActive, password, dob, biometricId } = body;
+    const { id, name, email, personalEmail, phone, accountNumber, ifscCode, role, designation, monthlySalary, isActive, password, dob, biometricId } = body;
 
     if (!id) {
       return NextResponse.json({ error: "User ID is required" }, { status: 400 });
@@ -145,6 +129,8 @@ export async function PUT(request: NextRequest) {
     if (email !== undefined) updateData.email = email.toLowerCase().trim();
     if (personalEmail !== undefined) updateData.personalEmail = personalEmail ? personalEmail.toLowerCase().trim() : null;
     if (phone !== undefined) updateData.phone = phone ? phone.trim() : null;
+    if (accountNumber !== undefined) updateData.accountNumber = accountNumber ? accountNumber.trim() : null;
+    if (ifscCode !== undefined) updateData.ifscCode = ifscCode ? ifscCode.trim().toUpperCase() : null;
     if (role !== undefined) updateData.role = role;
     if (designation !== undefined) updateData.designation = designation;
     if (monthlySalary !== undefined) updateData.monthlySalary = monthlySalary;
@@ -189,15 +175,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "User ID is required" }, { status: 400 });
     }
 
-    // Soft delete
     await db.update(users).set({ isActive: false, updatedAt: new Date() }).where(eq(users.id, id));
-
-    await db.insert(auditLogs).values({
-      userId: currentUser.userId,
-      action: "deactivate",
-      entity: "user",
-      entityId: id,
-    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

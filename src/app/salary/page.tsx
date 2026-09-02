@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { IndianRupee, Download, ChevronLeft, ChevronRight, Mail, Printer, Clock, Calendar, ShieldCheck, CheckCircle2, AlertCircle } from "lucide-react";
+import { IndianRupee, Download, ChevronLeft, ChevronRight, Mail, Printer, Clock, Calendar, ShieldCheck, CheckCircle2, AlertCircle, Building2 } from "lucide-react";
 import AppShell from "@/components/AppShell";
 import { format, addMonths, subMonths } from "date-fns";
 
@@ -20,6 +20,8 @@ interface SalaryRecord {
   email: string | null;
   personalEmail?: string | null;
   phone?: string | null;
+  accountNumber?: string | null;
+  ifscCode?: string | null;
   dob?: string | null;
   biometricId?: string | null;
   monthlySalary: string;
@@ -94,7 +96,7 @@ export default function SalaryPage() {
   const handleExport = () => {
     if (!data) return;
     const headers = [
-      "Name", "Designation", "Role", "Biometric ID", "Monthly Salary", 
+      "Name", "Designation", "Role", "Biometric ID", "Phone", "Bank A/C No", "IFSC Code", "Monthly Salary", 
       "Paid Days", "Deducted Days", "Working Hrs", "Overtime (Hrs)", 
       "Available CL", "Available CO", "CL Dates Taken", "LOP Dates", 
       "Earned Salary", "Deductions", "Final Net Payable"
@@ -104,6 +106,9 @@ export default function SalaryPage() {
       `"${s.designation || "-"}"`,
       `"${s.role}"`,
       `"${s.biometricId || "-"}"`,
+      `"${s.phone || "-"}"`,
+      `"${s.accountNumber || "-"}"`,
+      `"${s.ifscCode || "-"}"`,
       s.monthlySalary, 
       s.paidDays, 
       s.deductedDays, 
@@ -153,16 +158,28 @@ export default function SalaryPage() {
     setPrintRecord(s);
     setTimeout(() => {
       window.print();
-    }, 200);
+    }, 180);
   };
 
   return (
     <AppShell>
       <div className="space-y-6">
         
-        {/* Style Tag for Page Printing */}
+        {/* Style Tag for Page Printing - Strictly 1 Single Page */}
         <style dangerouslySetInnerHTML={{ __html: `
+          @page {
+            size: A4 portrait;
+            margin: 6mm 8mm;
+          }
           @media print {
+            html, body {
+              height: 100% !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              background: #ffffff !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
             body * {
               visibility: hidden;
             }
@@ -170,12 +187,15 @@ export default function SalaryPage() {
               visibility: visible;
             }
             #print-section {
-              position: absolute;
-              left: 0;
-              top: 0;
-              width: 100%;
-              margin: 0;
-              padding: 20px;
+              position: absolute !important;
+              left: 0 !important;
+              top: 0 !important;
+              width: 100% !important;
+              max-width: 100% !important;
+              margin: 0 !important;
+              padding: 10px 14px !important;
+              page-break-after: avoid !important;
+              page-break-inside: avoid !important;
               box-shadow: none !important;
               border: none !important;
             }
@@ -186,7 +206,7 @@ export default function SalaryPage() {
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between print:hidden">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Salary Management</h1>
-            <p className="text-sm text-gray-500 mt-0.5">Automated payroll, leave quotas & detailed payslip generation</p>
+            <p className="text-sm text-gray-500 mt-0.5">Automated payroll, bank transfers & 1-page executive payslips</p>
           </div>
           <div className="flex flex-wrap gap-2">
             {isManager && (
@@ -239,7 +259,7 @@ export default function SalaryPage() {
                     <button 
                       onClick={() => handlePrintPayslip(s)}
                       className="p-2 rounded-xl bg-gray-50 hover:bg-blue-50 text-gray-600 hover:text-blue-600 transition-colors border border-gray-100" 
-                      title="Download / Print Detailed Payslip"
+                      title="Download / Print 1-Page Payslip"
                     >
                       <Printer className="w-4 h-4" />
                     </button>
@@ -256,13 +276,19 @@ export default function SalaryPage() {
                       <span className="font-medium text-gray-800">{s.totalWorkingHours}h | {s.totalOvertimeHours || "0.0"}h OT</span>
                     </div>
                     <div className="flex justify-between text-gray-500">
-                      <span>Casual Leave (CL) Balance:</span>
+                      <span>Casual Leave (CL):</span>
                       <span className="font-semibold text-purple-700">{s.clBalance?.available ?? s.clDays} Days left</span>
                     </div>
                     <div className="flex justify-between text-gray-500">
-                      <span>Comp Off (CO) Balance:</span>
+                      <span>Comp Off (CO):</span>
                       <span className="font-semibold text-indigo-700">{s.coBalance?.available ?? s.coDays} Days earned</span>
                     </div>
+                    {s.accountNumber && (
+                      <div className="flex justify-between text-[11px] text-blue-700 pt-1 border-t border-gray-200/60 font-mono">
+                        <span>Bank A/c:</span>
+                        <span>{s.accountNumber} ({s.ifscCode})</span>
+                      </div>
+                    )}
                     {s.deductedDays > 0 && (
                       <div className="flex justify-between pt-1 border-t border-gray-200/60 text-red-600 font-semibold">
                         <span>LOP / Deducted Days:</span>
@@ -300,7 +326,7 @@ export default function SalaryPage() {
                       onClick={() => handlePrintPayslip(s)} 
                       className="text-xs font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 px-3 py-1.5 rounded-lg"
                     >
-                      View Payslip
+                      Print Payslip
                     </button>
                   </div>
                 </div>
@@ -309,174 +335,170 @@ export default function SalaryPage() {
           </div>
         )}
 
-        {/* High-End Corporate Printable Payslip */}
+        {/* High-End Corporate Printable Payslip - Guaranteed STRICT 1-PAGE A4 */}
         {printRecord && (
-          <div id="print-section" className="hidden print:block bg-white p-8 max-w-2xl mx-auto border border-gray-300 rounded-2xl shadow-sm text-gray-800">
+          <div id="print-section" className="hidden print:block bg-white max-w-2xl mx-auto text-gray-800 font-sans">
             
             {/* Header with Logo */}
-            <div className="flex items-center justify-between border-b-2 border-blue-900/80 pb-4 mb-5">
-              <div className="flex items-center gap-3.5">
-                <img src="/logo.png" alt="Company Logo" className="h-16 w-auto object-contain" />
+            <div className="flex items-center justify-between border-b-2 border-blue-900/80 pb-2 mb-2.5">
+              <div className="flex items-center gap-2.5">
+                <img src="/logo.png" alt="Company Logo" className="h-12 w-auto object-contain" />
                 <div>
-                  <h2 className="text-2xl font-black text-gray-900 tracking-tight">Four Dee Motion Picture</h2>
-                  <p className="text-xs text-gray-500 font-medium">Office ERP & Employee Payroll System</p>
-                  <p className="text-[10px] text-gray-400">teamsimran.in • Chennai, Tamil Nadu</p>
+                  <h2 className="text-lg font-black text-gray-900 tracking-tight leading-none">Four Dee Motion Picture</h2>
+                  <p className="text-[10px] text-gray-500 font-medium leading-tight mt-0.5">Office ERP & Employee Payroll System</p>
+                  <p className="text-[9px] text-gray-400 leading-none">teamsimran.in • Chennai, Tamil Nadu</p>
                 </div>
               </div>
               <div className="text-right">
-                <span className="inline-block bg-blue-900 text-white text-[11px] font-bold px-3 py-1 rounded-md uppercase tracking-wider mb-1">
+                <span className="inline-block bg-blue-900 text-white text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wider mb-0.5">
                   Salary Payslip
                 </span>
-                <p className="text-xs font-bold text-gray-800">Pay Period: {format(currentMonth, "MMMM yyyy")}</p>
-                <p className="text-[10px] text-gray-400">Ref: FD-PAY-{format(currentMonth, "yyyyMM")}-{printRecord.userId.slice(0, 5).toUpperCase()}</p>
+                <p className="text-[11px] font-bold text-gray-800 leading-tight">Pay Period: {format(currentMonth, "MMMM yyyy")}</p>
+                <p className="text-[8px] text-gray-400 font-mono">Ref: FD-PAY-{format(currentMonth, "yyyyMM")}-{printRecord.userId.slice(0, 5).toUpperCase()}</p>
               </div>
             </div>
 
-            {/* Employee Meta Details Card */}
-            <div className="bg-gray-50/80 border border-gray-200 rounded-xl p-4 mb-5 grid grid-cols-2 gap-y-2 text-xs">
+            {/* Employee Meta & Bank Transfer Details Card */}
+            <div className="bg-gray-50/80 border border-gray-200 rounded-lg p-2.5 mb-2.5 grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11px]">
               <div>
-                <span className="text-gray-400 font-medium">Employee Name:</span>
-                <p className="font-bold text-gray-900 text-sm">{printRecord.name}</p>
+                <span className="text-gray-400 font-medium text-[10px]">Employee Name:</span>
+                <p className="font-bold text-gray-900 text-xs">{printRecord.name}</p>
               </div>
               <div>
-                <span className="text-gray-400 font-medium">Official / Personal Email:</span>
+                <span className="text-gray-400 font-medium text-[10px]">Designation & Department:</span>
+                <p className="font-semibold text-gray-800">{printRecord.designation || "-"} <span className="text-gray-400 font-normal">({printRecord.role.replace("_", " ")})</span></p>
+              </div>
+              <div>
+                <span className="text-gray-400 font-medium text-[10px]">Official / Personal Email:</span>
                 <p className="font-semibold text-gray-800 truncate">{printRecord.personalEmail || printRecord.email || "-"}</p>
               </div>
               <div>
-                <span className="text-gray-400 font-medium">Designation:</span>
-                <p className="font-semibold text-gray-800">{printRecord.designation || "-"}</p>
+                <span className="text-gray-400 font-medium text-[10px]">Phone & Biometric ID:</span>
+                <p className="font-semibold text-gray-800">{printRecord.phone || "-"} • Bio ID: {printRecord.biometricId ? `#${printRecord.biometricId}` : "Standard"}</p>
               </div>
-              <div>
-                <span className="text-gray-400 font-medium">Phone / Contact:</span>
-                <p className="font-semibold text-gray-800">{printRecord.phone || "-"}</p>
-              </div>
-              <div>
-                <span className="text-gray-400 font-medium">Department / Role:</span>
-                <p className="font-semibold text-gray-800 capitalize">{printRecord.role.replace("_", " ")}</p>
-              </div>
-              <div>
-                <span className="text-gray-400 font-medium">Biometric ID & Payment Mode:</span>
-                <p className="font-semibold text-gray-800">{printRecord.biometricId ? `#${printRecord.biometricId}` : "Standard"} • Direct Bank Transfer</p>
+              <div className="col-span-2 pt-1 border-t border-gray-200/60 flex items-center justify-between">
+                <div>
+                  <span className="text-gray-400 font-medium text-[10px]">Disbursement Mode:</span>
+                  <p className="font-bold text-gray-800">Direct Bank Transfer</p>
+                </div>
+                {printRecord.accountNumber && (
+                  <div className="text-right">
+                    <span className="text-gray-400 font-medium text-[10px]">Bank Transfer Details:</span>
+                    <p className="font-mono font-bold text-blue-900 text-[11px]">
+                      A/C: <span className="text-blue-700">{printRecord.accountNumber}</span> • IFSC: <span className="text-blue-700">{printRecord.ifscCode || "-"}</span>
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* 4-Stat Metric Grid */}
-            <div className="grid grid-cols-4 gap-2 text-center mb-5">
-              <div className="p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/40">
-                <span className="text-[10px] font-semibold text-emerald-800 uppercase block">Total Paid Days</span>
-                <span className="text-base font-extrabold text-emerald-700">{printRecord.paidDays} / {data?.totalDaysInMonth || 30}</span>
+            <div className="grid grid-cols-4 gap-1.5 text-center mb-2.5">
+              <div className="p-1.5 rounded-lg border border-emerald-200 bg-emerald-50/40">
+                <span className="text-[9px] font-semibold text-emerald-800 uppercase block">Total Paid Days</span>
+                <span className="text-sm font-extrabold text-emerald-700">{printRecord.paidDays} / {data?.totalDaysInMonth || 30}</span>
               </div>
-              <div className="p-2.5 rounded-xl border border-blue-200 bg-blue-50/40">
-                <span className="text-[10px] font-semibold text-blue-800 uppercase block">Total Hours</span>
-                <span className="text-base font-extrabold text-blue-700">{printRecord.totalWorkingHours} hrs</span>
+              <div className="p-1.5 rounded-lg border border-blue-200 bg-blue-50/40">
+                <span className="text-[9px] font-semibold text-blue-800 uppercase block">Working Hours</span>
+                <span className="text-sm font-extrabold text-blue-700">{printRecord.totalWorkingHours} hrs</span>
               </div>
-              <div className="p-2.5 rounded-xl border border-purple-200 bg-purple-50/40">
-                <span className="text-[10px] font-semibold text-purple-800 uppercase block">Overtime</span>
-                <span className="text-base font-extrabold text-purple-700">{printRecord.totalOvertimeHours || "0.0"} hrs</span>
+              <div className="p-1.5 rounded-lg border border-purple-200 bg-purple-50/40">
+                <span className="text-[9px] font-semibold text-purple-800 uppercase block">Overtime</span>
+                <span className="text-sm font-extrabold text-purple-700">{printRecord.totalOvertimeHours || "0.0"} hrs</span>
               </div>
-              <div className="p-2.5 rounded-xl border border-gray-200 bg-gray-50/60">
-                <span className="text-[10px] font-semibold text-gray-700 uppercase block">Late Time</span>
-                <span className="text-base font-extrabold text-gray-800">{printRecord.totalLateMinutes || 0} mins</span>
+              <div className="p-1.5 rounded-lg border border-gray-200 bg-gray-50/60">
+                <span className="text-[9px] font-semibold text-gray-700 uppercase block">Late Time</span>
+                <span className="text-sm font-extrabold text-gray-800">{printRecord.totalLateMinutes || 0} mins</span>
               </div>
             </div>
 
             {/* Leave & Quota Balances Detailed Breakdown */}
-            <div className="border border-purple-200 bg-purple-50/25 rounded-xl p-3.5 mb-5 text-xs">
-              <h4 className="font-bold text-purple-950 text-xs uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-purple-700" />
-                Leave Accruals & Balance Quotas
-              </h4>
-              <div className="grid grid-cols-2 gap-4 pb-2 border-b border-purple-100">
+            <div className="border border-purple-200 bg-purple-50/20 rounded-lg p-2.5 mb-2.5 text-[10px]">
+              <div className="grid grid-cols-2 gap-2 pb-1.5 border-b border-purple-100 font-medium">
                 <div>
-                  <span className="text-gray-500 font-medium">Casual Leave (CL):</span>
-                  <p className="font-bold text-purple-900 text-sm">
-                    {printRecord.clBalance?.available ?? printRecord.clDays} Days Available
-                    <span className="text-[10px] font-normal text-gray-500 block">
-                      (Accrued: {printRecord.clBalance?.accrued ?? 0} | Used: {printRecord.clBalance?.used ?? 0})
-                    </span>
-                  </p>
+                  <span className="text-gray-500">Casual Leave (CL): </span>
+                  <b className="text-purple-900 text-[11px]">{printRecord.clBalance?.available ?? printRecord.clDays} Days Left</b>
+                  <span className="text-gray-400 text-[9px] ml-1">(Accrued: {printRecord.clBalance?.accrued ?? 0} | Used: {printRecord.clBalance?.used ?? 0})</span>
                 </div>
                 <div>
-                  <span className="text-gray-500 font-medium">Comp Off (CO) Balance:</span>
-                  <p className="font-bold text-indigo-900 text-sm">
-                    {printRecord.coBalance?.available ?? printRecord.coDays} Days Available
-                    <span className="text-[10px] font-normal text-gray-500 block">
-                      (Earned from Holidays/Sundays: {printRecord.coBalance?.accrued ?? 0})
-                    </span>
-                  </p>
+                  <span className="text-gray-500">Comp Off (CO): </span>
+                  <b className="text-indigo-900 text-[11px]">{printRecord.coBalance?.available ?? printRecord.coDays} Days Available</b>
+                  <span className="text-gray-400 text-[9px] ml-1">(Holidays/Sundays: {printRecord.coBalance?.accrued ?? 0})</span>
                 </div>
               </div>
 
-              {/* Leave Activity Details this Month */}
-              <div className="mt-2.5 space-y-1 text-[11px]">
+              {/* Compact Leave Activity Details */}
+              <div className="mt-1.5 space-y-0.5 text-[10px]">
                 {printRecord.clDates && printRecord.clDates.length > 0 && (
                   <p className="text-gray-700">
-                    <b className="text-purple-900">CL Taken this month:</b> {printRecord.clDates.join(", ")}
+                    <b className="text-purple-900">CL Taken:</b> {printRecord.clDates.join(", ")}
                   </p>
                 )}
                 {printRecord.holidayDates && printRecord.holidayDates.length > 0 && (
                   <p className="text-gray-700">
-                    <b className="text-amber-900">Official Paid Holidays:</b> {printRecord.holidayDates.join(", ")}
+                    <b className="text-amber-900">Public Holidays:</b> {printRecord.holidayDates.join(", ")}
                   </p>
                 )}
                 {(printRecord.sundayWorkDates?.length || printRecord.holidayWorkDates?.length) ? (
                   <p className="text-gray-700">
-                    <b className="text-indigo-900">Weekend / Holiday Work:</b> {[...(printRecord.sundayWorkDates || []), ...(printRecord.holidayWorkDates || [])].join(", ")}
+                    <b className="text-indigo-900">Holiday/Sunday Work (+1 CO):</b> {[...(printRecord.sundayWorkDates || []), ...(printRecord.holidayWorkDates || [])].join(", ")}
                   </p>
                 ) : null}
                 {printRecord.lopDates && printRecord.lopDates.length > 0 && (
                   <p className="text-red-700">
-                    <b className="text-red-900">Loss of Pay (LOP) / Unpaid Absences:</b> {printRecord.lopDates.join(", ")} ({printRecord.deductedDays} days total)
+                    <b className="text-red-900">Loss of Pay (LOP) / Unpaid:</b> {printRecord.deductedDays} day(s) 
+                    <span className="text-gray-500 text-[9px] ml-1">
+                      ({printRecord.lopDates.slice(0, 6).join(", ")}{printRecord.lopDates.length > 6 ? ` +${printRecord.lopDates.length - 6} more` : ""})
+                    </span>
                   </p>
                 )}
                 {(!printRecord.clDates?.length && !printRecord.lopDates?.length) && (
-                  <p className="text-emerald-700 font-medium">✨ Full attendance maintained with zero unapproved absences this pay period.</p>
+                  <p className="text-emerald-700 font-medium">✨ Full attendance maintained with zero deductions this pay period.</p>
                 )}
               </div>
             </div>
 
             {/* Financial Calculations Table */}
-            <h4 className="text-xs font-bold uppercase tracking-wider text-gray-600 mb-2">Earnings & Deductions Summary</h4>
-            <table className="w-full border border-gray-200 text-xs border-collapse mb-5">
+            <table className="w-full border border-gray-200 text-[11px] border-collapse mb-2.5">
               <thead>
                 <tr className="bg-gray-100 font-bold border-b border-gray-200 text-gray-800">
-                  <th className="p-2.5 text-left w-1/2 border-r border-gray-200">Earnings & Allowances</th>
-                  <th className="p-2.5 text-left w-1/2">Deductions</th>
+                  <th className="p-2 text-left w-1/2 border-r border-gray-200">Earnings & Allowances</th>
+                  <th className="p-2 text-left w-1/2">Deductions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 <tr>
-                  <td className="p-2.5 border-r border-gray-200 align-top space-y-1.5">
+                  <td className="p-2 border-r border-gray-200 align-top space-y-1">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Basic Monthly Gross Salary:</span>
                       <span className="font-semibold">₹{parseFloat(printRecord.monthlySalary).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
                     </div>
-                    <div className="flex justify-between text-gray-500 text-[11px]">
+                    <div className="flex justify-between text-gray-500 text-[10px]">
                       <span>Daily Pay Rate ({data?.totalDaysInMonth || 30} days):</span>
                       <span>₹{parseFloat(printRecord.dailySalary).toLocaleString("en-IN", { minimumFractionDigits: 2 })} / day</span>
                     </div>
-                    <div className="flex justify-between text-emerald-700 font-medium">
-                      <span>Paid Days Calculated ({printRecord.paidDays}d):</span>
+                    <div className="flex justify-between text-emerald-700 font-medium text-[10px]">
+                      <span>Paid Days Earned ({printRecord.paidDays}d):</span>
                       <span>₹{parseFloat(printRecord.earnedSalary).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
                     </div>
                   </td>
-                  <td className="p-2.5 align-top space-y-1.5">
+                  <td className="p-2 align-top space-y-1">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Loss of Pay Deductions ({printRecord.deductedDays}d):</span>
                       <span className="font-bold text-red-600">-₹{parseFloat(printRecord.deductions).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
                     </div>
-                    <div className="flex justify-between text-gray-500 text-[11px]">
+                    <div className="flex justify-between text-gray-500 text-[10px]">
                       <span>Other Statutory Deductions:</span>
                       <span>₹0.00</span>
                     </div>
                   </td>
                 </tr>
-                <tr className="bg-gray-50/70 font-bold">
-                  <td className="p-2.5 border-r border-gray-200 flex justify-between">
-                    <span>Total Gross Earnings:</span>
+                <tr className="bg-gray-50 font-bold">
+                  <td className="p-1.5 px-2 border-r border-gray-200 flex justify-between">
+                    <span>Total Gross:</span>
                     <span>₹{parseFloat(printRecord.monthlySalary).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
                   </td>
-                  <td className="p-2.5 flex justify-between text-red-700">
+                  <td className="p-1.5 px-2 flex justify-between text-red-700">
                     <span>Total Deductions:</span>
                     <span>-₹{parseFloat(printRecord.deductions).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
                   </td>
@@ -485,37 +507,36 @@ export default function SalaryPage() {
             </table>
 
             {/* Net Salary Highlight Box */}
-            <div className="bg-blue-900 text-white rounded-xl p-4 mb-8 flex items-center justify-between">
+            <div className="bg-blue-900 text-white rounded-lg p-2.5 px-4 mb-4 flex items-center justify-between">
               <div>
-                <p className="text-[11px] uppercase tracking-wider text-blue-200 font-semibold">Net Payable Salary</p>
-                <p className="text-xs text-blue-100">Disbursed via Direct Bank Transfer</p>
+                <p className="text-[9px] uppercase tracking-wider text-blue-200 font-semibold">Net Payable Salary</p>
+                <p className="text-[10px] text-blue-100">Disbursed via Direct Bank Transfer</p>
               </div>
               <div className="text-right">
-                <p className="text-2xl font-black tracking-tight">₹{parseFloat(printRecord.finalPayableSalary).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p>
+                <p className="text-xl font-black tracking-tight">₹{parseFloat(printRecord.finalPayableSalary).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p>
               </div>
             </div>
 
             {/* Signatures & Verification */}
-            <div className="grid grid-cols-2 gap-10 pt-6 border-t border-gray-200 text-center text-xs">
+            <div className="grid grid-cols-2 gap-8 pt-3 border-t border-gray-200 text-center text-[10px]">
               <div>
-                <div className="h-10"></div>
-                <div className="border-t border-gray-400 pt-1">
+                <div className="h-6"></div>
+                <div className="border-t border-gray-400 pt-0.5">
                   <p className="font-bold text-gray-900">Authorized Signatory</p>
-                  <p className="text-[10px] text-gray-400">Four Dee Motion Picture Management</p>
+                  <p className="text-[9px] text-gray-400">Four Dee Motion Picture Management</p>
                 </div>
               </div>
               <div>
-                <div className="h-10"></div>
-                <div className="border-t border-gray-400 pt-1">
+                <div className="h-6"></div>
+                <div className="border-t border-gray-400 pt-0.5">
                   <p className="font-bold text-gray-900">Employee Acknowledgment</p>
-                  <p className="text-[10px] text-gray-400">{printRecord.name}</p>
+                  <p className="text-[9px] text-gray-400">{printRecord.name}</p>
                 </div>
               </div>
             </div>
 
-            <div className="text-[9px] text-gray-400 text-center mt-6">
-              <p>This is an official computer-generated payroll document issued under Four Dee Motion Picture ERP.</p>
-              <p>© 2026 Four Dee Motion Picture. All rights reserved.</p>
+            <div className="text-[8px] text-gray-400 text-center mt-3">
+              <p>This is an official computer-generated payroll voucher issued under Four Dee Motion Picture ERP • teamsimran.in</p>
             </div>
           </div>
         )}

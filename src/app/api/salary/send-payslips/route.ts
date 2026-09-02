@@ -46,6 +46,8 @@ export async function POST(request: NextRequest) {
       email: users.email,
       personalEmail: users.personalEmail,
       phone: users.phone,
+      accountNumber: users.accountNumber,
+      ifscCode: users.ifscCode,
       biometricId: users.biometricId,
       role: users.role,
       designation: users.designation,
@@ -206,8 +208,15 @@ export async function POST(request: NextRequest) {
               <tr>
                 <td style="padding: 5px 0; color: #64748b;">Designation:</td>
                 <td style="padding: 5px 0; font-weight: 600;">${user.designation || "-"}</td>
+                <td style="padding: 5px 0; color: #64748b;">Phone / Contact:</td>
+                <td style="padding: 5px 0; font-weight: 600;">${user.phone || "-"}</td>
+              </tr>
+              <tr>
                 <td style="padding: 5px 0; color: #64748b;">Payment Mode:</td>
-                <td style="padding: 5px 0; font-weight: 600;">Direct Bank Transfer</td>
+                <td style="padding: 5px 0; font-weight: 600;" colspan="3">
+                  Direct Bank Transfer 
+                  ${user.accountNumber ? `<span style="color: #1e40af; font-family: monospace; font-size: 12px; margin-left: 6px;">(A/c: <b>${user.accountNumber}</b> | IFSC: <b>${user.ifscCode || "-"}</b>)</span>` : ""}
+                </td>
               </tr>
             </table>
 
