@@ -15,7 +15,15 @@ export async function POST(request: NextRequest) {
     const cleanEmail = email.toLowerCase().trim();
 
     const [user] = await db
-      .select()
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        passwordHash: users.passwordHash,
+        role: users.role,
+        designation: users.designation,
+        isActive: users.isActive,
+      })
       .from(users)
       .where(eq(users.email, cleanEmail))
       .limit(1);

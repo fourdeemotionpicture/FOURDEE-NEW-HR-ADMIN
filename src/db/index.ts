@@ -2,11 +2,16 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import * as schema from "./schema";
 
-const databaseUrl = process.env.DATABASE_URL;
+const rawDatabaseUrl = process.env.DATABASE_URL;
 
-const connectionString =
-  databaseUrl ||
-  "postgresql://postgres.psqpvochdmawlgatmmhn:FourDeeErp%402026%21@aws-0-ap-south-1.pooler.supabase.com:5432/postgres";
+// Automatically use Supabase transaction pooler port 6543 to avoid EMAXCONNSESSION limit on port 5432
+let connectionString =
+  rawDatabaseUrl ||
+  "postgresql://postgres.psqpvochdmawlgatmmhn:FourDeeErp%402026%21@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?sslmode=require";
+
+if (connectionString.includes(":5432") && connectionString.includes("pooler.supabase.com")) {
+  connectionString = connectionString.replace(":5432", ":6543");
+}
 
 const globalForDb = globalThis as typeof globalThis & {
   __arenaNextJsPostgresqlPool?: Pool;
@@ -19,9 +24,9 @@ export const pool =
   new Pool({
     connectionString,
     ssl: isLocal ? false : { rejectUnauthorized: false },
-    max: 10,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
+    max: 5,
+    idleTimeoutMillis: 10000,
+    connectionTimeoutMillis: 5000,
   });
 
 if (process.env.NODE_ENV !== "production") {
