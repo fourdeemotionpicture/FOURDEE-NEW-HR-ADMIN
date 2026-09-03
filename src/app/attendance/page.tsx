@@ -49,6 +49,14 @@ const STATUS_COLORS: Record<string, string> = {
   H: "bg-sky-50 text-sky-700 border-sky-200",
 };
 
+interface CurrentUser {
+  id: string;
+  name: string;
+  email?: string;
+  role?: string;
+  designation?: string;
+}
+
 export default function AttendancePage() {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,10 +65,12 @@ export default function AttendancePage() {
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   
   const [userRole, setUserRole] = useState("employee");
-  const [currentUser, setCurrentUser] = useState<{ id: string; name: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [employees, setEmployees] = useState<{ id: string; name: string }[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("");
   const [search, setSearch] = useState("");
+
+  const isCompOffEligible = userRole === "super_admin" || userRole === "owner_admin" || currentUser?.email === "sujith@fourdee.com" || (currentUser?.name?.toLowerCase().includes("surjith") ?? false);
   
   const [form, setForm] = useState({ userId: "", date: "", inTime: "", outTime: "", notes: "", status: "present" });
   const [leaveForm, setLeaveForm] = useState({ startDate: "", endDate: "", type: "CL", reason: "" });
@@ -352,13 +362,13 @@ export default function AttendancePage() {
           <div className={`${isManager ? "lg:col-span-3" : ""} space-y-6 overflow-y-auto h-auto lg:h-[calc(100vh-220px)] pr-2`}>
             
             {/* Quota Summary & Stats */}
-            <div className={`grid gap-3 sm:gap-4 ${coBalance.accrued > 0 || currentUser?.role === "super_admin" || currentUser?.email === "sujith@fourdee.com" ? "grid-cols-2 sm:grid-cols-5" : "grid-cols-2 sm:grid-cols-4"}`}>
+            <div className={`grid gap-3 sm:gap-4 ${coBalance.accrued > 0 || isCompOffEligible ? "grid-cols-2 sm:grid-cols-5" : "grid-cols-2 sm:grid-cols-4"}`}>
               <div className="kpi-card bg-purple-50/20 border-purple-100/50">
                 <p className="text-xs text-purple-600 font-medium">Casual Leave Quota</p>
                 <p className="text-xl font-bold text-purple-700 mt-1">{clBalance.available} CL left</p>
                 <p className="text-[10px] text-gray-400 mt-0.5">Accrued: {clBalance.accrued} | Used: {clBalance.used}</p>
               </div>
-              {(coBalance.accrued > 0 || currentUser?.role === "super_admin" || currentUser?.email === "sujith@fourdee.com") && (
+              {(coBalance.accrued > 0 || isCompOffEligible) && (
                 <div className="kpi-card bg-indigo-50/20 border-indigo-100/50">
                   <p className="text-xs text-indigo-600 font-medium">Comp Off Balance</p>
                   <p className="text-xl font-bold text-indigo-700 mt-1">{coBalance.available} CO left</p>
@@ -616,7 +626,7 @@ export default function AttendancePage() {
                     className="input-field font-medium text-gray-900"
                   >
                     <option value="CL">Casual Leave (CL) - {clBalance.available} day(s) left</option>
-                    {(currentUser?.role === "super_admin" || currentUser?.email === "sujith@fourdee.com" || currentUser?.name?.toLowerCase().includes("surjith")) && (
+                    {isCompOffEligible && (
                       <option value="CO">Comp Off (CO) - {coBalance.available} day(s) earned</option>
                     )}
                   </select>
