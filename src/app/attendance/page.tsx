@@ -352,17 +352,19 @@ export default function AttendancePage() {
           <div className={`${isManager ? "lg:col-span-3" : ""} space-y-6 overflow-y-auto h-auto lg:h-[calc(100vh-220px)] pr-2`}>
             
             {/* Quota Summary & Stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4">
+            <div className={`grid gap-3 sm:gap-4 ${coBalance.accrued > 0 || currentUser?.role === "super_admin" || currentUser?.email === "sujith@fourdee.com" ? "grid-cols-2 sm:grid-cols-5" : "grid-cols-2 sm:grid-cols-4"}`}>
               <div className="kpi-card bg-purple-50/20 border-purple-100/50">
                 <p className="text-xs text-purple-600 font-medium">Casual Leave Quota</p>
                 <p className="text-xl font-bold text-purple-700 mt-1">{clBalance.available} CL left</p>
                 <p className="text-[10px] text-gray-400 mt-0.5">Accrued: {clBalance.accrued} | Used: {clBalance.used}</p>
               </div>
-              <div className="kpi-card bg-indigo-50/20 border-indigo-100/50">
-                <p className="text-xs text-indigo-600 font-medium">Comp Off Balance</p>
-                <p className="text-xl font-bold text-indigo-700 mt-1">{coBalance.available} CO left</p>
-                <p className="text-[10px] text-gray-400 mt-0.5">Earned: {coBalance.accrued} | Used: {coBalance.used}</p>
-              </div>
+              {(coBalance.accrued > 0 || currentUser?.role === "super_admin" || currentUser?.email === "sujith@fourdee.com") && (
+                <div className="kpi-card bg-indigo-50/20 border-indigo-100/50">
+                  <p className="text-xs text-indigo-600 font-medium">Comp Off Balance</p>
+                  <p className="text-xl font-bold text-indigo-700 mt-1">{coBalance.available} CO left</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">Earned: {coBalance.accrued} | Used: {coBalance.used}</p>
+                </div>
+              )}
               <div className="kpi-card"><p className="text-xs text-gray-500">Present (Full)</p><p className="text-xl font-bold text-emerald-600 mt-1">{presentCount}</p></div>
               <div className="kpi-card"><p className="text-xs text-gray-500 font-medium text-red-600">Late Days</p><p className="text-xl font-bold text-red-600 mt-1">{lateCount}</p></div>
               <div className="kpi-card col-span-2 sm:col-span-1"><p className="text-xs text-gray-500">Total Hours</p><p className="text-xl font-bold text-gray-900 mt-1">{totalHours.toFixed(1)}</p></div>
@@ -614,9 +616,9 @@ export default function AttendancePage() {
                     className="input-field font-medium text-gray-900"
                   >
                     <option value="CL">Casual Leave (CL) - {clBalance.available} day(s) left</option>
-                    <option value="CO">Comp Off (CO) - {coBalance.available} day(s) earned</option>
-                    <option value="SL">Sick Leave (SL)</option>
-                    <option value="H">Holiday (H) Request</option>
+                    {(currentUser?.role === "super_admin" || currentUser?.email === "sujith@fourdee.com" || currentUser?.name?.toLowerCase().includes("surjith")) && (
+                      <option value="CO">Comp Off (CO) - {coBalance.available} day(s) earned</option>
+                    )}
                   </select>
                 </div>
 

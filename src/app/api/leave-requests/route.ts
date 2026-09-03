@@ -91,6 +91,10 @@ export async function POST(request: NextRequest) {
     // Leave Type Tag
     const leaveTypeToSave = isHalfDay && type === "CL" ? "HD_CL" : type;
 
+    if (type === "CO" && !isAdmin && !currentUser.email.includes("sujith")) {
+      return NextResponse.json({ error: "Comp Off is not available for this role. Please apply Casual Leave (CL)." }, { status: 400 });
+    }
+
     // Quota validation for CL & CO
     if ((type === "CL" || leaveTypeToSave === "HD_CL") && !isAdmin) {
       // Auto-approve if they have sufficient CL quota left

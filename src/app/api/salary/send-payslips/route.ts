@@ -5,7 +5,7 @@ import { users, attendance, holidays } from "@/db/schema";
 import { eq, and, gte, lte } from "drizzle-orm";
 import { format, startOfMonth, endOfMonth, parse, subMonths, getDaysInMonth, eachDayOfInterval, getDay } from "date-fns";
 import { sendEmail } from "@/lib/email";
-import { getUserLeaveBalances } from "@/lib/leave-balances";
+import { getUserLeaveBalances, isUserCompOffEligible } from "@/lib/leave-balances";
 
 export async function POST(request: NextRequest) {
   try {
@@ -132,12 +132,14 @@ export async function POST(request: NextRequest) {
           } else if (status === "WO_PRESENT") {
             presentCount++;
             paidDays += 1.0;
-            weekendWorkDates.push(`${dateDisplay} (Sunday +1 CO)`);
+            const isEligible = isUserCompOffEligible(user);
+            weekendWorkDates.push(`${dateDisplay} (Sunday${isEligible ? " +1 CO" : ""})`);
           } else if (status === "H_PRESENT") {
             presentCount++;
             paidDays += 1.0;
             const hName = holidayDateMap.get(dateStr) || "Holiday";
-            weekendWorkDates.push(`${dateDisplay} (${hName} +1 CO)`);
+            const isEligible = isUserCompOffEligible(user);
+            weekendWorkDates.push(`${dateDisplay} (${hName}${isEligible ? " +1 CO" : ""})`);
           } else if (status === "HD_CL" || status === "half_day_cl") {
             halfDayCount++;
             clCount += 0.5;

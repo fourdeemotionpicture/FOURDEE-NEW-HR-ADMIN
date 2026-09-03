@@ -8,6 +8,13 @@ export interface LeaveBalances {
   coBalance: { accrued: number; used: number; available: number };
 }
 
+export function isUserCompOffEligible(user: { role: string; email?: string | null; name?: string | null }): boolean {
+  if (user.role === "super_admin" || user.role === "owner_admin") return true;
+  if (user.email === "sujith@fourdee.com") return true;
+  if (user.name && user.name.toLowerCase().includes("surjith")) return true;
+  return false;
+}
+
 export async function getUserLeaveBalances(userId: string, targetDate: Date = new Date()): Promise<LeaveBalances> {
   const currentMonth = targetDate.getMonth() + 1; // 1 to 12
   const currentYear = targetDate.getFullYear();
@@ -26,7 +33,7 @@ export async function getUserLeaveBalances(userId: string, targetDate: Date = ne
     startMonth = joinDate.getMonth() + 1;
   }
 
-  // 1. CL Calculation (1.0 per month accrued)
+  // 1. CL Calculation (1.0 per month accrued for all employees)
   const clAccrued = Math.max(1, currentMonth - startMonth + 1);
   const attendanceRecords = await db.select().from(attendance).where(
     and(
@@ -48,12 +55,20 @@ export async function getUserLeaveBalances(userId: string, targetDate: Date = ne
 
   const clAvailable = Math.max(0, Math.round((clAccrued - clUsed) * 10) / 10);
 
-  // 2. Comp Off (CO) Calculation
+  // 2. Comp Off (CO) Calculation (Exclusive to Surjith Thangavel / Super Admin)
+  const isCompOffEligible = isUserCompOffEligible(user);
+
+  if (!isCompOffEligible) {
+    return {
+      clBalance: { accrued: clAccrued, used: clUsed, available: clAvailable },
+      coBalance: { accrued: 0, used: 0, available: 0 },
+    };
+  }
+
   // Get all official holiday dates for this year
   const allHolidays = await db.select({ date: holidays.date }).from(holidays).where(eq(holidays.year, currentYear));
   const holidayDateSet = new Set(allHolidays.map((h) => h.date));
 
-  // Count days worked on a Holiday or Sunday (where status === 'present', 'half_day', 'WO_PRESENT', 'H_PRESENT', or workingHours > 0)
   let coAccrued = 0;
   for (const record of attendanceRecords) {
     const isWorked = 
@@ -69,8 +84,10 @@ export async function getUserLeaveBalances(userId: string, targetDate: Date = ne
       const recordDate = new Date(record.date);
       const isSunday = getDay(recordDate) === 0;
       const isHoliday = holidayDateSet.has(record.date);
+      const isSaturday = getDay(recordDate) === 6;
 
-      if (isSunday || isHoliday) {
+      // Accrues on Holiday or Sunday or Week Off work
+      if (isSunday || isHoliday || (isSaturday && record.notes?.includes("Week Off"))) {
         coAccrued++;
       }
     }
