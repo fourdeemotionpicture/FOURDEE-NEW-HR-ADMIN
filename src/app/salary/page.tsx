@@ -344,7 +344,7 @@ export default function SalaryPage() {
               <div className="flex items-center gap-2.5">
                 <img src="/logo.png" alt="Company Logo" className="h-12 w-auto object-contain" />
                 <div>
-                  <h2 className="text-lg font-black text-gray-900 tracking-tight leading-none">Four Dee Motion Picture</h2>
+                  <h2 className="text-lg font-black text-gray-900 tracking-tight leading-none">Four Dee Motion Pictures Private Limited</h2>
                   <p className="text-[10px] text-gray-500 font-medium leading-tight mt-0.5">Office ERP & Employee Payroll System</p>
                   <p className="text-[9px] text-gray-400 leading-none">teamsimran.in • Chennai, Tamil Nadu</p>
                 </div>
@@ -523,7 +523,7 @@ export default function SalaryPage() {
                 <div className="h-6"></div>
                 <div className="border-t border-gray-400 pt-0.5">
                   <p className="font-bold text-gray-900">Authorized Signatory</p>
-                  <p className="text-[9px] text-gray-400">Four Dee Motion Picture Management</p>
+                  <p className="text-[9px] text-gray-400">Four Dee Motion Pictures Private Limited Management</p>
                 </div>
               </div>
               <div>
@@ -536,7 +536,7 @@ export default function SalaryPage() {
             </div>
 
             <div className="text-[8px] text-gray-400 text-center mt-3">
-              <p>This is an official computer-generated payroll voucher issued under Four Dee Motion Picture ERP • teamsimran.in</p>
+              <p>This is an official computer-generated payroll voucher issued under Four Dee Motion Pictures Private Limited ERP • teamsimran.in</p>
             </div>
           </div>
         )}

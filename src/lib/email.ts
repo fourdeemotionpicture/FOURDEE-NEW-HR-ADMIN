@@ -13,7 +13,7 @@ export async function sendEmail({ to, subject, html }: SendEmailParams) {
   const port = parseInt(process.env.SMTP_PORT || "587");
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
-  const from = process.env.SMTP_FROM || `"FourDee ERP" <${user || "noreply@fourdeemotionpicture.com"}>`;
+  const from = process.env.SMTP_FROM || `"Four Dee Motion Pictures Private Limited ERP" <${user || "noreply@fourdeemotionpictures.com"}>`;
 
   const logMessage = `
 ========================================

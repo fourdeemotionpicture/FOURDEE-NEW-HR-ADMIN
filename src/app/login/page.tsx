@@ -125,7 +125,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-6">
-          © {new Date().getFullYear()} Four Dee Motion Picture. Internal use only.
+          © {new Date().getFullYear()} Four Dee Motion Pictures Private Limited. Internal use only.
         </p>
       </div>
     </div>

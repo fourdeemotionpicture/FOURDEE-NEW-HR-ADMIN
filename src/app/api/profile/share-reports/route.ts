@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
     let htmlContent = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 680px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; padding: 28px; color: #1f2937; background-color: #ffffff;">
         <div style="text-align: center; border-bottom: 2px solid #f3f4f6; padding-bottom: 20px; margin-bottom: 24px;">
-          <h2 style="margin: 0; color: #1e3a8a; font-size: 22px;">Four Dee Motion Picture</h2>
+          <h2 style="margin: 0; color: #1e3a8a; font-size: 22px;">Four Dee Motion Pictures Private Limited</h2>
           <p style="margin: 6px 0 0; font-size: 15px; font-weight: 600; color: #4b5563;">Monthly Employee Performance & Activity Report</p>
           <p style="margin: 4px 0 0; font-size: 13px; color: #9ca3af;">Period: <b>${formattedMonthName}</b></p>
         </div>
@@ -173,8 +173,8 @@ export async function POST(request: NextRequest) {
 
     htmlContent += `
         <div style="text-align: center; border-top: 1px solid #e5e7eb; padding-top: 18px; margin-top: 24px; font-size: 12px; color: #9ca3af;">
-          <p style="margin: 0;">This report was generated directly from the Four Dee Motion Picture ERP Portal.</p>
-          <p style="margin: 4px 0 0;">© Four Dee Motion Picture. All rights reserved.</p>
+          <p style="margin: 0;">This report was generated directly from the Four Dee Motion Pictures Private Limited ERP Portal.</p>
+          <p style="margin: 4px 0 0;">© Four Dee Motion Pictures Private Limited. All rights reserved.</p>
         </div>
       </div>
     `;

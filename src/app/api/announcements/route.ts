@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
                  ${attachmentUrl ? `<p><b>Attachment:</b> <a href="${attachmentUrl}">View Attachment</a></p>` : ""}
                  <br/>
                  <p>Best Regards,</p>
-                 <p><b>Four Dee Motion Picture ERP Team</b></p>`,
+                 <p><b>Four Dee Motion Pictures Private Limited ERP Team</b></p>`,
         });
       }
     } catch (emailErr) {

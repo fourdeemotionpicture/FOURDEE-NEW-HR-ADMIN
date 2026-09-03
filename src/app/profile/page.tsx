@@ -242,7 +242,7 @@ export default function ProfilePage() {
     setDownloadingReport(true);
     try {
       const { attendance: attList, workReports: wrList } = await fetchMonthReportsData();
-      let csvContent = `FOUR DEE MOTION PICTURE - MONTHLY PERFORMANCE REPORT\n`;
+      let csvContent = `Four Dee Motion Pictures Private Limited - MONTHLY PERFORMANCE REPORT\n`;
       csvContent += `Employee: "${profile?.name}", Month: "${selectedMonth}"\n\n`;
 
       if (includeAttendance && attList.length > 0) {
@@ -644,7 +644,7 @@ export default function ProfilePage() {
                 
                 {/* Company Header */}
                 <div className="text-center border-b-2 border-gray-200 pb-5">
-                  <h1 className="text-2xl font-black tracking-wide text-blue-900">FOUR DEE MOTION PICTURE</h1>
+                  <h1 className="text-2xl font-black tracking-wide text-blue-900">Four Dee Motion Pictures Private Limited</h1>
                   <p className="text-sm font-semibold text-gray-600 mt-1 uppercase tracking-wider">Monthly Employee Performance & Activity Report</p>
                   <p className="text-xs text-gray-400 mt-0.5">Month: {format(new Date(`${selectedMonth}-01`), "MMMM yyyy")}</p>
                 </div>
@@ -744,7 +744,7 @@ export default function ProfilePage() {
 
                 {/* Footer */}
                 <div className="text-center pt-6 border-t border-gray-200 text-[11px] text-gray-400">
-                  <p>© Four Dee Motion Picture. ERP Generated Report.</p>
+                  <p>© Four Dee Motion Pictures Private Limited. ERP Generated Report.</p>
                 </div>
 
               </div>

@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Four Dee Motion Picture - Office ERP",
+  title: "Four Dee Motion Pictures Private Limited - Office ERP",
   description: "Internal Office ERP & Employee Management System",
 };
 

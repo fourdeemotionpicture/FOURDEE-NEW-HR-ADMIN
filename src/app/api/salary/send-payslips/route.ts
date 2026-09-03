@@ -189,7 +189,7 @@ export async function POST(request: NextRequest) {
           <!-- Header -->
           <div style="background-color: #0f172a; padding: 24px 28px; color: #ffffff; display: flex; justify-content: space-between; align-items: center;">
             <div>
-              <h2 style="margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.5px;">Four Dee Motion Picture</h2>
+              <h2 style="margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.5px;">Four Dee Motion Pictures Private Limited</h2>
               <p style="margin: 4px 0 0; font-size: 12px; color: #94a3b8;">Office ERP & Payroll System • teamsimran.in</p>
             </div>
             <div style="text-align: right;">
@@ -302,8 +302,8 @@ export async function POST(request: NextRequest) {
             </div>
 
             <div style="font-size: 11px; color: #94a3b8; text-align: center; line-height: 1.5;">
-              <p style="margin: 0;">This is an official computer-generated payroll voucher issued under Four Dee Motion Picture ERP.</p>
-              <p style="margin: 4px 0 0;">© 2026 Four Dee Motion Picture. All rights reserved.</p>
+              <p style="margin: 0;">This is an official computer-generated payroll voucher issued under Four Dee Motion Pictures Private Limited ERP.</p>
+              <p style="margin: 4px 0 0;">© 2026 Four Dee Motion Pictures Private Limited. All rights reserved.</p>
             </div>
           </div>
         </div>
@@ -313,7 +313,7 @@ export async function POST(request: NextRequest) {
       if (targetMail) {
         const mailResult = await sendEmail({
           to: targetMail,
-          subject: `📄 Salary Payslip - ${formattedMonth} - Four Dee Motion Picture`,
+          subject: `📄 Salary Payslip - ${formattedMonth} - Four Dee Motion Pictures Private Limited`,
           html: htmlBody,
         });
 

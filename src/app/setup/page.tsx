@@ -119,7 +119,7 @@ export default function SetupPage() {
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-6">
-          Four Dee Motion Picture ERP · First-time setup only
+          Four Dee Motion Pictures Private Limited ERP · First-time setup only
         </p>
       </div>
     </div>
