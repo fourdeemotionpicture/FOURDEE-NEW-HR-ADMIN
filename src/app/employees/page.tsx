@@ -125,6 +125,8 @@ export default function EmployeesPage() {
     return map[role] || "badge-neutral";
   };
 
+  const isAdmin = userRole === "super_admin" || userRole === "owner_admin";
+
   return (
     <AppShell>
       <div className="space-y-6">
@@ -133,7 +135,7 @@ export default function EmployeesPage() {
             <h1 className="text-2xl font-bold text-gray-900">Employees</h1>
             <p className="text-sm text-gray-500 mt-0.5">Manage team members, roles & bank details</p>
           </div>
-          {userRole !== "owner_admin" && (
+          {isAdmin && (
             <button onClick={() => { 
               setShowModal(true); 
               setEditId(null); 
@@ -192,7 +194,7 @@ export default function EmployeesPage() {
                 <div><span className="text-gray-400">Bio ID:</span> {emp.biometricId || "-"}</div>
                 <div><span className="text-gray-400">DOB:</span> {emp.dob ? format(new Date(emp.dob), "MMM dd, yyyy") : "-"}</div>
               </div>
-              {userRole !== "owner_admin" && (
+              {isAdmin && (
                 <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
                   <button onClick={() => handleEdit(emp)} className="btn-secondary text-xs py-1.5 px-3"><Edit2 className="w-3.5 h-3.5 mr-1" /> Edit</button>
                   <button onClick={() => handleDelete(emp.id)} className="btn-danger text-xs py-1.5 px-3"><Trash2 className="w-3.5 h-3.5 mr-1" /> Deactivate</button>
@@ -217,7 +219,7 @@ export default function EmployeesPage() {
                   <th className="px-5 py-3.5">Monthly Salary</th>
                   <th className="px-5 py-3.5">Bio ID</th>
                   <th className="px-5 py-3.5">Status</th>
-                  {userRole !== "owner_admin" && <th className="px-5 py-3.5 text-right">Actions</th>}
+                  {isAdmin && <th className="px-5 py-3.5 text-right">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -253,7 +255,7 @@ export default function EmployeesPage() {
                     <td className="px-5 py-3.5 text-sm font-medium text-gray-900">₹{parseFloat(emp.monthlySalary || "0").toLocaleString()}</td>
                     <td className="px-5 py-3.5 text-sm font-mono text-blue-600 font-bold">{emp.biometricId ? `#${emp.biometricId}` : "-"}</td>
                     <td className="px-5 py-3.5"><span className={`badge ${emp.isActive ? "badge-success" : "badge-danger"}`}>{emp.isActive ? "Active" : "Inactive"}</span></td>
-                    {userRole !== "owner_admin" && (
+                    {isAdmin && (
                       <td className="px-5 py-3.5 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button onClick={() => handleEdit(emp)} className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-blue-600 transition-colors"><Edit2 className="w-4 h-4" /></button>

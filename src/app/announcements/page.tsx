@@ -50,7 +50,7 @@ export default function AnnouncementsPage() {
             <h1 className="text-2xl font-bold text-gray-900">Announcements</h1>
             <p className="text-sm text-gray-500 mt-0.5">Company announcements and updates</p>
           </div>
-          {userRole === "super_admin" && (
+          {(userRole === "super_admin" || userRole === "owner_admin") && (
             <button onClick={() => setShowModal(true)} className="btn-primary"><Plus className="w-4.5 h-4.5" /> New Announcement</button>
           )}
         </motion.div>
@@ -73,7 +73,7 @@ export default function AnnouncementsPage() {
                     </div>
                     <h3 className="text-sm font-semibold text-gray-900 line-clamp-1">{ann.title}</h3>
                   </div>
-                  {userRole === "super_admin" && (
+                  {(userRole === "super_admin" || userRole === "owner_admin") && (
                     <button onClick={() => handleDelete(ann.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
                   )}
                 </div>

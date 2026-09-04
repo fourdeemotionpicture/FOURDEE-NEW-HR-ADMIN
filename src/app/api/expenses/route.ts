@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const currentUser = await getCurrentUser();
-    if (!currentUser || (currentUser.role !== "super_admin" && currentUser.role !== "office_admin")) {
+    if (!currentUser || (currentUser.role !== "super_admin" && currentUser.role !== "owner_admin" && currentUser.role !== "office_admin")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const currentUser = await getCurrentUser();
-    if (!currentUser || currentUser.role !== "super_admin") {
+    if (!currentUser || (currentUser.role !== "super_admin" && currentUser.role !== "owner_admin")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

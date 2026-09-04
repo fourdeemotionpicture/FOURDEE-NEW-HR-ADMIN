@@ -107,9 +107,7 @@ export default function WorkReportsPage() {
           </div>
           <div className="flex gap-2">
             <button onClick={handleExport} className="btn-secondary"><FileText className="w-4.5 h-4.5" /> Export</button>
-            {userRole !== "owner_admin" && (
-              <button onClick={() => setShowModal(true)} className="btn-primary"><Plus className="w-4.5 h-4.5" /> Add Report</button>
-            )}
+            <button onClick={() => setShowModal(true)} className="btn-primary"><Plus className="w-4.5 h-4.5" /> Add Report</button>
           </div>
         </motion.div>
 
@@ -177,11 +175,9 @@ export default function WorkReportsPage() {
                                 {report.userName && (userRole === "super_admin" || userRole === "owner_admin") && <p className="text-xs text-blue-600 mt-0.5">By: {report.userName}</p>}
                                 {report.imageUrl && <a href={report.imageUrl} target="_blank" className="text-xs text-blue-500 hover:underline mt-0.5 inline-block">View Image</a>}
                               </div>
-                              {userRole !== "owner_admin" && (
-                                <button onClick={() => handleDelete(report.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors ml-2">
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              )}
+                              <button onClick={() => handleDelete(report.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors ml-2">
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
                             </div>
                           ))}
                         </div>

@@ -55,8 +55,8 @@ import { sendEmail } from "@/lib/email";
 export async function POST(request: NextRequest) {
   try {
     const currentUser = await getCurrentUser();
-    if (!currentUser || currentUser.role !== "super_admin") {
-      return NextResponse.json({ error: "Only Super Admin can create announcements" }, { status: 403 });
+    if (!currentUser || (currentUser.role !== "super_admin" && currentUser.role !== "owner_admin")) {
+      return NextResponse.json({ error: "Admin access required" }, { status: 403 });
     }
 
     const body = await request.json();
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const currentUser = await getCurrentUser();
-    if (!currentUser || currentUser.role !== "super_admin") {
+    if (!currentUser || (currentUser.role !== "super_admin" && currentUser.role !== "owner_admin")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

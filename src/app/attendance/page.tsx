@@ -288,24 +288,22 @@ export default function AttendancePage() {
             >
               Apply Leave
             </button>
-            {userRole !== "owner_admin" && (
-              <button 
-                onClick={() => { 
-                  setShowModal(true); 
-                  setForm({ 
-                    userId: selectedEmployeeId || currentUser?.id || "", 
-                    date: today, 
-                    inTime: "10:00", 
-                    outTime: "18:00", 
-                    notes: "",
-                    status: "present"
-                  }); 
-                }} 
-                className="btn-primary"
-              >
-                <Plus className="w-4.5 h-4.5" /> Mark Attendance
-              </button>
-            )}
+            <button 
+              onClick={() => { 
+                setShowModal(true); 
+                setForm({ 
+                  userId: selectedEmployeeId || currentUser?.id || "", 
+                  date: today, 
+                  inTime: "10:00", 
+                  outTime: "18:00", 
+                  notes: "",
+                  status: "present"
+                }); 
+              }} 
+              className="btn-primary"
+            >
+              <Plus className="w-4.5 h-4.5" /> Mark Attendance
+            </button>
           </div>
         </motion.div>
 

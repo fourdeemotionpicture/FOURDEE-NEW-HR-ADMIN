@@ -100,7 +100,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Report not found" }, { status: 404 });
     }
 
-    if (currentUser.role !== "super_admin" && report[0].userId !== currentUser.userId) {
+    if (currentUser.role !== "super_admin" && currentUser.role !== "owner_admin" && report[0].userId !== currentUser.userId) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

@@ -481,7 +481,7 @@ export default function FanpageWorkPage() {
                                 {isManager && (
                                   <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">By: {rec.userName}</span>
                                 )}
-                                {(userRole === "super_admin" || currentUser?.id === rec.userId) && (
+                                {(isManager || currentUser?.id === rec.userId) && (
                                   <button
                                     onClick={() => handleDelete(rec.id)}
                                     className="p-1 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"

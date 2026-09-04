@@ -110,12 +110,8 @@ export default function ExpensesPage() {
           </div>
           <div className="flex flex-wrap gap-2">
             <button onClick={handleExport} className="btn-secondary"><Receipt className="w-4.5 h-4.5" /> Export</button>
-            {userRole !== "owner_admin" && (
-              <>
-                <button onClick={() => { setModalType("petty_cash"); setShowModal(true); }} className="btn-secondary"><Wallet className="w-4.5 h-4.5" /> Add Cash</button>
-                <button onClick={() => { setModalType("expense"); setShowModal(true); }} className="btn-primary"><Plus className="w-4.5 h-4.5" /> Add Expense</button>
-              </>
-            )}
+            <button onClick={() => { setModalType("petty_cash"); setShowModal(true); }} className="btn-secondary"><Wallet className="w-4.5 h-4.5" /> Add Cash</button>
+            <button onClick={() => { setModalType("expense"); setShowModal(true); }} className="btn-primary"><Plus className="w-4.5 h-4.5" /> Add Expense</button>
           </div>
         </motion.div>
 
@@ -168,7 +164,7 @@ export default function ExpensesPage() {
                     </p>
                     <p className="text-xs text-gray-500">Bal: ₹{parseFloat(entry.balanceAfter ?? "0").toLocaleString()}</p>
                   </div>
-                  {userRole === "super_admin" && (
+                  {(userRole === "super_admin" || userRole === "owner_admin") && (
                     <button onClick={() => handleDelete(entry.id, "petty_cash")} className="p-1.5 rounded-lg hover:bg-red-50 text-red-500 transition-colors" title="Delete entry">
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -216,7 +212,7 @@ export default function ExpensesPage() {
                               <p className="text-sm font-medium text-red-600">₹{parseFloat(exp.amount ?? "0").toLocaleString()}</p>
                               <p className="text-xs text-gray-500">Bal: ₹{parseFloat(exp.balanceAfter ?? "0").toLocaleString()}</p>
                             </div>
-                            {userRole === "super_admin" && (
+                            {(userRole === "super_admin" || userRole === "owner_admin") && (
                               <button onClick={() => handleDelete(exp.id, "expense")} className="p-1.5 rounded-lg hover:bg-red-50 text-red-500 transition-colors" title="Delete expense">
                                 <Trash2 className="w-4 h-4" />
                               </button>
