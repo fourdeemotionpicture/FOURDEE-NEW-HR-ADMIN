@@ -233,12 +233,12 @@ export default function FanpageWorkPage() {
   return (
     <AppShell>
       <div className="space-y-6">
-        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <Share2 className="w-6 h-6 text-blue-600 animate-pulse" /> Fanpage Work Logs
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <Share2 className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 animate-pulse" /> Fanpage Work Logs
             </h1>
-            <p className="text-sm text-gray-500 mt-0.5">Track social media page postings and task entries</p>
+            <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Track social media page postings and task entries</p>
           </div>
           <button
             onClick={() => {
@@ -253,7 +253,7 @@ export default function FanpageWorkPage() {
                 postLink: ""
               });
             }}
-            className="btn-primary"
+            className="btn-primary w-full sm:w-auto justify-center text-xs sm:text-sm"
           >
             <Plus className="w-4.5 h-4.5" /> Log Fanpage Work
           </button>

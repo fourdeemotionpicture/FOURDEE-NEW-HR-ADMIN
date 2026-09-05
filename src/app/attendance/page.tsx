@@ -2,23 +2,49 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Clock, Plus, Calendar, ChevronLeft, ChevronRight, X, Search, Check, AlertCircle } from "lucide-react";
+import { 
+  Calendar as CalendarIcon, 
+  Clock, 
+  ChevronLeft, 
+  ChevronRight, 
+  Plus, 
+  Search, 
+  AlertCircle, 
+  Check, 
+  X, 
+  User, 
+  Briefcase, 
+  CheckCircle2, 
+  Sun, 
+  Moon, 
+  Award,
+  ListFilter,
+  CalendarDays,
+  LayoutList
+} from "lucide-react";
 import AppShell from "@/components/AppShell";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, subMonths, addMonths, isSameDay } from "date-fns";
 
 interface AttendanceRecord {
   id: string;
   userId: string;
+  userName?: string;
   date: string;
   inTime: string | null;
   outTime: string | null;
   status: string;
   source: string;
   lateMinutes: number | null;
-  workingHours: string | null;
   overtimeMinutes: number | null;
-  userName?: string;
-  notes?: string | null;
+  workingHours: string | null;
+  notes: string | null;
+}
+
+interface Holiday {
+  id: string;
+  name: string;
+  date: string;
+  year: number;
 }
 
 interface LeaveRequest {
@@ -70,6 +96,10 @@ export default function AttendancePage() {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("");
   const [search, setSearch] = useState("");
 
+  // Mobile View Controls
+  const [mobileView, setMobileView] = useState<"calendar" | "list">("calendar");
+  const [selectedDay, setSelectedDay] = useState<Date>(new Date());
+
   const isCompOffEligible = userRole === "super_admin" || userRole === "owner_admin" || currentUser?.email === "sujith@fourdee.com" || (currentUser?.name?.toLowerCase().includes("surjith") ?? false);
   
   const [form, setForm] = useState({ userId: "", date: "", inTime: "", outTime: "", notes: "", status: "present" });
@@ -78,15 +108,19 @@ export default function AttendancePage() {
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [clBalance, setClBalance] = useState({ accrued: 0, used: 0, available: 0 });
   const [coBalance, setCoBalance] = useState({ accrued: 0, used: 0, available: 0 });
-  const [holidaysList, setHolidaysList] = useState<{ id: string; name: string; date: string }[]>([]);
+  const [holidaysList, setHolidaysList] = useState<Holiday[]>([]);
 
-  const monthStr = format(currentMonth, "yyyy-MM");
   const isManager = userRole === "super_admin" || userRole === "owner_admin";
+  const monthStr = format(currentMonth, "yyyy-MM");
 
-  const fetchData = useCallback(async () => {
+  const fetchAttendance = useCallback(async () => {
     setLoading(true);
-    const targetUserId = selectedEmployeeId || "";
-    
+    const targetUserId = selectedEmployeeId || currentUser?.id;
+    if (!targetUserId) {
+      setLoading(false);
+      return;
+    }
+
     // Fetch attendance
     const attendanceRes = await fetch(`/api/attendance?month=${monthStr}&userId=${targetUserId}`);
     const attendanceData = await attendanceRes.json();
@@ -100,7 +134,7 @@ export default function AttendancePage() {
     setCoBalance(leaveData.coBalance || { accrued: 0, used: 0, available: 0 });
 
     setLoading(false);
-  }, [monthStr, selectedEmployeeId]);
+  }, [monthStr, selectedEmployeeId, currentUser?.id]);
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -121,10 +155,6 @@ export default function AttendancePage() {
   }, []);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  useEffect(() => {
     if (isManager) {
       fetch("/api/employees")
         .then((r) => r.json())
@@ -133,113 +163,76 @@ export default function AttendancePage() {
     }
   }, [isManager]);
 
+  useEffect(() => {
+    fetchAttendance();
+  }, [fetchAttendance]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const body: Record<string, any> = { 
-      date: form.date, 
-      source: "manual", 
-      status: form.status 
-    };
-
-    // Only set time parameters if not setting a leave/weekoff status
-    const isLeave = ["WO", "CL", "SL", "CO", "LOP", "H", "absent"].includes(form.status);
-    if (!isLeave) {
-      body.inTime = form.inTime;
-      body.outTime = form.outTime;
-    }
-
-    if (form.notes) body.notes = form.notes;
-    
-    const targetId = form.userId || selectedEmployeeId || currentUser?.id;
-    if (targetId) body.userId = targetId;
-
-    try {
-      const res = await fetch("/api/attendance", { 
-        method: "POST", 
-        headers: { "Content-Type": "application/json" }, 
-        body: JSON.stringify(body) 
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        alert(data.error || "Failed to save attendance");
-        return;
-      }
-      setShowModal(false);
-      setForm({ userId: "", date: "", inTime: "", outTime: "", notes: "", status: "present" });
-      fetchData();
-    } catch {
-      alert("Network error. Please try again.");
-    }
+    await fetch("/api/attendance", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(form),
+    });
+    setShowModal(false);
+    fetchAttendance();
   };
 
   const handleLeaveSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      const res = await fetch("/api/leave-requests", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...leaveForm, isHalfDay }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        alert(data.error || "Failed to submit leave request");
-        return;
-      }
-      setShowLeaveModal(false);
-      setLeaveForm({ startDate: "", endDate: "", type: "CL", reason: "" });
-      setIsHalfDay(false);
-      fetchData();
-    } catch {
-      alert("Network error. Please try again.");
+    const res = await fetch("/api/leave-requests", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...leaveForm, isHalfDay }),
+    });
+    const resData = await res.json();
+    if (!res.ok) {
+      alert(resData.error || "Failed to submit leave request");
+      return;
     }
+    setShowLeaveModal(false);
+    setLeaveForm({ startDate: "", endDate: "", type: "CL", reason: "" });
+    setIsHalfDay(false);
+    fetchAttendance();
   };
 
-  const handleReviewLeave = async (requestId: string, status: "approved" | "rejected") => {
-    if (!confirm(`Are you sure you want to ${status} this request?`)) return;
-
-    try {
-      const res = await fetch("/api/leave-requests", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requestId, status }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        alert(data.error || "Action failed");
-        return;
-      }
-      fetchData();
-    } catch {
-      alert("Network error.");
-    }
+  const handleReviewLeave = async (id: string, status: "approved" | "rejected") => {
+    await fetch("/api/leave-requests", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, status }),
+    });
+    fetchAttendance();
   };
 
   const handleDayClick = (day: Date) => {
+    setSelectedDay(day);
     const dateStr = format(day, "yyyy-MM-dd");
-    if (!isManager && dateStr !== today) {
-      return; // Employees can only submit for today
-    }
+    const rec = getRecordForDate(dateStr);
     
-    const record = getRecordForDate(dateStr);
-    const holidayInfo = holidaysList.find((h) => h.date === dateStr);
-    const isSunday = getDay(day) === 0;
-
-    let defaultStatus = "present";
-    if (record?.status) {
-      defaultStatus = record.status;
-    } else if (isSunday) {
-      defaultStatus = "WO";
-    } else if (holidayInfo) {
-      defaultStatus = "H";
+    // Only open edit modal if user is manager or clicks to edit
+    if (isManager) {
+      setForm({
+        userId: selectedEmployeeId || currentUser?.id || "",
+        date: dateStr,
+        inTime: rec?.inTime || "10:00",
+        outTime: rec?.outTime || "18:00",
+        notes: rec?.notes || "",
+        status: rec?.status || (getDay(day) === 0 ? "WO" : "present"),
+      });
     }
+  };
 
+  const openMarkAttendanceModalForDay = (day: Date) => {
+    const dateStr = format(day, "yyyy-MM-dd");
+    const rec = getRecordForDate(dateStr);
     setForm({
       userId: selectedEmployeeId || currentUser?.id || "",
       date: dateStr,
-      inTime: record?.inTime || "10:00",
-      outTime: record?.outTime || "18:00",
-      notes: record?.notes || "",
-      status: defaultStatus,
+      inTime: rec?.inTime || "10:00",
+      outTime: rec?.outTime || "18:00",
+      notes: rec?.notes || "",
+      status: rec?.status || (getDay(day) === 0 ? "WO" : "present"),
     });
     setShowModal(true);
   };
@@ -253,8 +246,8 @@ export default function AttendancePage() {
   const getRecordForDate = (dateStr: string) => records.find((r) => r.date === dateStr);
 
   // Stats
-  const presentCount = records.filter((r) => r.status === "present").length;
-  const halfDayCount = records.filter((r) => r.status === "half_day").length;
+  const presentCount = records.filter((r) => r.status === "present" || r.status === "WO_PRESENT" || r.status === "H_PRESENT").length;
+  const halfDayCount = records.filter((r) => r.status === "half_day" || r.status === "HD_CL").length;
   const lateCount = records.filter((r) => (r.lateMinutes ?? 0) > 0).length;
   const totalHours = records.reduce((acc, r) => acc + parseFloat(r.workingHours ?? "0"), 0);
 
@@ -265,15 +258,23 @@ export default function AttendancePage() {
   const pendingLeaves = leaveRequests.filter((l) => l.status === "pending");
   const historicalLeaves = leaveRequests.filter((l) => l.status !== "pending");
 
+  // Selected Day Details for Mobile Inspection Card
+  const selectedDateStr = format(selectedDay, "yyyy-MM-dd");
+  const selectedRecord = getRecordForDate(selectedDateStr);
+  const selectedHoliday = holidaysList.find((h) => h.date === selectedDateStr);
+  const selectedIsSunday = getDay(selectedDay) === 0;
+
   return (
     <AppShell>
-      <div className="space-y-6">
-        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
+      <div className="space-y-4 sm:space-y-6">
+        
+        {/* Top Header */}
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Attendance</h1>
-            <p className="text-sm text-gray-500 mt-0.5">Track and manage attendance & leaves</p>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Attendance</h1>
+            <p className="text-xs sm:text-sm text-gray-500">Track and manage attendance, shifts & leaves</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <button 
               onClick={() => { 
                 setShowLeaveModal(true); 
@@ -284,322 +285,524 @@ export default function AttendancePage() {
                   reason: "" 
                 }); 
               }} 
-              className="btn-secondary"
+              className="btn-secondary text-xs sm:text-sm py-2 px-3 flex-1 sm:flex-none justify-center"
             >
               Apply Leave
             </button>
             <button 
-              onClick={() => { 
-                setShowModal(true); 
-                setForm({ 
-                  userId: selectedEmployeeId || currentUser?.id || "", 
-                  date: today, 
-                  inTime: "10:00", 
-                  outTime: "18:00", 
-                  notes: "",
-                  status: "present"
-                }); 
-              }} 
-              className="btn-primary"
+              onClick={() => openMarkAttendanceModalForDay(new Date())} 
+              className="btn-primary text-xs sm:text-sm py-2 px-3 flex-1 sm:flex-none justify-center"
             >
-              <Plus className="w-4.5 h-4.5" /> Mark Attendance
+              <Plus className="w-4 h-4" /> Mark Attendance
             </button>
           </div>
         </motion.div>
 
-        {/* Master-Detail Layout Container */}
-        <div className={`grid ${isManager ? "grid-cols-1 lg:grid-cols-4 gap-6" : "grid-cols-1"}`}>
-          
-          {/* Master Sidebar (For Admins) */}
-          {isManager && (
-            <div className="card p-4 space-y-4 lg:col-span-1 h-60 lg:h-[calc(100vh-220px)] flex flex-col">
-              <div>
-                <h3 className="font-semibold text-gray-900 text-sm">Employees</h3>
-                <p className="text-xs text-gray-400 mt-0.5">Select to view logs</p>
-              </div>
-              <div className="relative">
+        {/* Master Employee Switcher for Managers */}
+        {isManager && (
+          <div className="card p-3">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Select Employee</span>
+              <div className="relative w-40 sm:w-56">
                 <input
                   type="text"
-                  placeholder="Search employee..."
+                  placeholder="Search name..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="input-field pl-9 text-sm"
+                  className="input-field py-1 pl-7 text-xs"
                 />
-                <Search className="w-4.5 h-4.5 text-gray-400 absolute left-3 top-3.5" />
+                <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2 top-2" />
               </div>
-              <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
+            </div>
+            
+            {/* Horizontal Scrollable Chips on Mobile, Grid on Desktop */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1.5 no-scrollbar">
+              <button
+                onClick={() => setSelectedEmployeeId(currentUser?.id || "")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 ${
+                  selectedEmployeeId === currentUser?.id
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                <User className="w-3.5 h-3.5" />
+                Self ({currentUser?.name || "Admin"})
+              </button>
+              
+              {filteredEmployees.map((emp) => (
                 <button
-                  onClick={() => setSelectedEmployeeId(currentUser?.id || "")}
-                  className={`w-full text-left px-3 py-2.5 rounded-xl transition-all flex items-center justify-between ${
-                    selectedEmployeeId === currentUser?.id
-                      ? "bg-blue-50 text-blue-700 font-medium border border-blue-100"
-                      : "hover:bg-gray-50 text-gray-700"
+                  key={emp.id}
+                  onClick={() => setSelectedEmployeeId(emp.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 ${
+                    selectedEmployeeId === emp.id
+                      ? "bg-blue-600 text-white shadow-xs"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                   }`}
                 >
-                  <span className="text-sm">Self ({currentUser?.name || "Admin"})</span>
+                  <div className="w-4 h-4 rounded-full bg-blue-100 text-blue-700 text-[10px] flex items-center justify-center font-bold">
+                    {emp.name.charAt(0)}
+                  </div>
+                  {emp.name}
                 </button>
-                
-                {filteredEmployees.map((emp) => (
-                  <button
-                    key={emp.id}
-                    onClick={() => setSelectedEmployeeId(emp.id)}
-                    className={`w-full text-left px-3 py-2.5 rounded-xl transition-all flex items-center justify-between ${
-                      selectedEmployeeId === emp.id
-                        ? "bg-blue-50 text-blue-700 font-medium border border-blue-100"
-                        : "hover:bg-gray-50 text-gray-700"
-                    }`}
-                  >
-                    <span className="text-sm truncate">{emp.name}</span>
-                  </button>
-                ))}
-              </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Quota & Stats KPI Cards */}
+        <div className={`grid gap-2 sm:gap-4 ${coBalance.accrued > 0 || isCompOffEligible ? "grid-cols-2 sm:grid-cols-5" : "grid-cols-2 sm:grid-cols-4"}`}>
+          <div className="kpi-card bg-purple-50/30 border-purple-100 p-3 sm:p-4">
+            <p className="text-[11px] sm:text-xs text-purple-700 font-semibold">Casual Leave Quota</p>
+            <p className="text-lg sm:text-2xl font-bold text-purple-900 mt-0.5">{clBalance.available} CL left</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">Accrued: {clBalance.accrued} | Used: {clBalance.used}</p>
+          </div>
+          
+          {(coBalance.accrued > 0 || isCompOffEligible) && (
+            <div className="kpi-card bg-indigo-50/30 border-indigo-100 p-3 sm:p-4">
+              <p className="text-[11px] sm:text-xs text-indigo-700 font-semibold">Comp Off Balance</p>
+              <p className="text-lg sm:text-2xl font-bold text-indigo-900 mt-0.5">{coBalance.available} CO left</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">Earned: {coBalance.accrued} | Used: {coBalance.used}</p>
             </div>
           )}
 
-          {/* Details Panel */}
-          <div className={`${isManager ? "lg:col-span-3" : ""} space-y-6 overflow-y-auto h-auto lg:h-[calc(100vh-220px)] pr-2`}>
-            
-            {/* Quota Summary & Stats */}
-            <div className={`grid gap-3 sm:gap-4 ${coBalance.accrued > 0 || isCompOffEligible ? "grid-cols-2 sm:grid-cols-5" : "grid-cols-2 sm:grid-cols-4"}`}>
-              <div className="kpi-card bg-purple-50/20 border-purple-100/50">
-                <p className="text-xs text-purple-600 font-medium">Casual Leave Quota</p>
-                <p className="text-xl font-bold text-purple-700 mt-1">{clBalance.available} CL left</p>
-                <p className="text-[10px] text-gray-400 mt-0.5">Accrued: {clBalance.accrued} | Used: {clBalance.used}</p>
-              </div>
-              {(coBalance.accrued > 0 || isCompOffEligible) && (
-                <div className="kpi-card bg-indigo-50/20 border-indigo-100/50">
-                  <p className="text-xs text-indigo-600 font-medium">Comp Off Balance</p>
-                  <p className="text-xl font-bold text-indigo-700 mt-1">{coBalance.available} CO left</p>
-                  <p className="text-[10px] text-gray-400 mt-0.5">Earned: {coBalance.accrued} | Used: {coBalance.used}</p>
-                </div>
-              )}
-              <div className="kpi-card"><p className="text-xs text-gray-500">Present (Full)</p><p className="text-xl font-bold text-emerald-600 mt-1">{presentCount}</p></div>
-              <div className="kpi-card"><p className="text-xs text-gray-500 font-medium text-red-600">Late Days</p><p className="text-xl font-bold text-red-600 mt-1">{lateCount}</p></div>
-              <div className="kpi-card col-span-2 sm:col-span-1"><p className="text-xs text-gray-500">Total Hours</p><p className="text-xl font-bold text-gray-900 mt-1">{totalHours.toFixed(1)}</p></div>
+          <div className="kpi-card p-3 sm:p-4">
+            <p className="text-[11px] sm:text-xs text-gray-500 font-medium">Present Days</p>
+            <p className="text-lg sm:text-2xl font-bold text-emerald-600 mt-0.5">{presentCount}</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">{halfDayCount > 0 ? `+${halfDayCount} Half-day(s)` : "Full attendance"}</p>
+          </div>
+
+          <div className="kpi-card p-3 sm:p-4">
+            <p className="text-[11px] sm:text-xs text-red-600 font-medium">Late Days</p>
+            <p className="text-lg sm:text-2xl font-bold text-red-600 mt-0.5">{lateCount}</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">Shift delays</p>
+          </div>
+
+          <div className="kpi-card p-3 sm:p-4 col-span-2 sm:col-span-1">
+            <p className="text-[11px] sm:text-xs text-gray-500 font-medium">Total Working Hours</p>
+            <p className="text-lg sm:text-2xl font-bold text-gray-900 mt-0.5">{totalHours.toFixed(1)} hrs</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">{format(currentMonth, "MMMM yyyy")}</p>
+          </div>
+        </div>
+
+        {/* Month Navigator & Mobile View Switcher */}
+        <div className="card p-3 sm:p-4 flex flex-col sm:flex-row gap-2.5 sm:items-center sm:justify-between">
+          <div className="flex items-center justify-between w-full sm:w-auto gap-3">
+            <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-100"><ChevronLeft className="w-5 h-5 text-gray-600" /></button>
+            <div className="text-center">
+              <h2 className="text-base sm:text-lg font-bold text-gray-900">{format(currentMonth, "MMMM yyyy")}</h2>
+              <p className="text-[10px] sm:text-xs text-gray-400">Monthly Attendance Log</p>
+            </div>
+            <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-100"><ChevronRight className="w-5 h-5 text-gray-600" /></button>
+          </div>
+
+          {/* View Mode Toggle for Mobile Screens */}
+          <div className="flex sm:hidden bg-gray-100 p-1 rounded-xl w-full border border-gray-200 text-xs font-semibold">
+            <button
+              onClick={() => setMobileView("calendar")}
+              className={`flex-1 py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+                mobileView === "calendar" ? "bg-white text-blue-700 shadow-xs" : "text-gray-500"
+              }`}
+            >
+              <CalendarDays className="w-3.5 h-3.5" /> Calendar View
+            </button>
+            <button
+              onClick={() => setMobileView("list")}
+              className={`flex-1 py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+                mobileView === "list" ? "bg-white text-blue-700 shadow-xs" : "text-gray-500"
+              }`}
+            >
+              <LayoutList className="w-3.5 h-3.5" /> Daily Feed
+            </button>
+          </div>
+        </div>
+
+        {/* ─── 1. MOBILE CALENDAR VIEW (Aesthetic, Compact, Zero-Collision) ─── */}
+        <div className={`sm:hidden space-y-3 ${mobileView === "calendar" ? "block" : "hidden"}`}>
+          <div className="card p-3">
+            {/* Day of week headers */}
+            <div className="grid grid-cols-7 gap-1 mb-2 text-center text-[10px] font-bold text-gray-400 uppercase">
+              <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
             </div>
 
-            {/* Month Navigator */}
-            <div className="card p-4">
-              <div className="flex items-center justify-between">
-                <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-2 rounded-lg hover:bg-gray-100"><ChevronLeft className="w-5 h-5 text-gray-600" /></button>
-                <h2 className="text-lg font-semibold text-gray-900">{format(currentMonth, "MMMM yyyy")}</h2>
-                <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-2 rounded-lg hover:bg-gray-100"><ChevronRight className="w-5 h-5 text-gray-600" /></button>
+            {/* Calendar Grid */}
+            <div className="grid grid-cols-7 gap-1">
+              {Array.from({ length: startDay }).map((_, i) => <div key={`empty-m-${i}`} />)}
+              {days.map((day) => {
+                const dateStr = format(day, "yyyy-MM-dd");
+                const record = getRecordForDate(dateStr);
+                const isSelected = isSameDay(day, selectedDay);
+                const isToday = dateStr === today;
+                const isSunday = getDay(day) === 0;
+                const holidayInfo = holidaysList.find((h) => h.date === dateStr);
+
+                // Determine badge dot color
+                let dotColor = "bg-transparent";
+                let statusLabel = "";
+                if (record) {
+                  if (record.status === "present" || record.status === "WO_PRESENT" || record.status === "H_PRESENT") {
+                    dotColor = "bg-emerald-500";
+                    statusLabel = "P";
+                  } else if (record.status === "half_day" || record.status === "HD_CL") {
+                    dotColor = "bg-purple-500";
+                    statusLabel = "0.5";
+                  } else if (record.status === "CL") {
+                    dotColor = "bg-purple-600";
+                    statusLabel = "CL";
+                  } else if (record.status === "CO") {
+                    dotColor = "bg-indigo-600";
+                    statusLabel = "CO";
+                  } else if (record.status === "WO") {
+                    dotColor = "bg-gray-400";
+                    statusLabel = "WO";
+                  } else if (record.status === "H") {
+                    dotColor = "bg-amber-500";
+                    statusLabel = "H";
+                  } else if (record.status === "absent" || record.status === "LOP") {
+                    dotColor = "bg-red-500";
+                    statusLabel = "A";
+                  }
+                } else if (holidayInfo) {
+                  dotColor = "bg-amber-500";
+                  statusLabel = "H";
+                } else if (isSunday) {
+                  dotColor = "bg-gray-300";
+                  statusLabel = "WO";
+                }
+
+                return (
+                  <button
+                    key={dateStr}
+                    type="button"
+                    onClick={() => setSelectedDay(day)}
+                    className={`aspect-square flex flex-col items-center justify-center rounded-xl p-1 relative transition-all ${
+                      isSelected 
+                        ? "bg-blue-600 text-white shadow-md font-bold scale-105 z-10" 
+                        : isToday 
+                        ? "border border-blue-400 bg-blue-50 text-blue-900" 
+                        : holidayInfo 
+                        ? "bg-amber-50/70 text-amber-900" 
+                        : isSunday 
+                        ? "bg-gray-50 text-gray-400" 
+                        : "hover:bg-gray-50 text-gray-700"
+                    }`}
+                  >
+                    <span className="text-xs leading-none">{format(day, "d")}</span>
+                    {statusLabel && (
+                      <span className={`text-[8px] mt-0.5 leading-none px-1 py-0.2 rounded-full font-bold ${
+                        isSelected 
+                          ? "bg-white/20 text-white" 
+                          : record?.status === "present" || record?.status === "WO_PRESENT" || record?.status === "H_PRESENT"
+                          ? "bg-emerald-100 text-emerald-800"
+                          : record?.status === "HD_CL" || record?.status === "CL"
+                          ? "bg-purple-100 text-purple-800"
+                          : holidayInfo || record?.status === "H"
+                          ? "bg-amber-100 text-amber-800"
+                          : "bg-gray-100 text-gray-600"
+                      }`}>
+                        {statusLabel}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Mobile Selected Day Inspection Card */}
+          <div className="card p-4 bg-white border-2 border-blue-200/80 shadow-sm space-y-3">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
+              <div>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Selected Day</span>
+                <h3 className="text-sm font-bold text-gray-900">{format(selectedDay, "EEEE, dd MMMM yyyy")}</h3>
+              </div>
+              
+              <div>
+                {selectedRecord ? (
+                  <span className={`badge ${STATUS_COLORS[selectedRecord.status] || "badge-neutral"} text-xs py-1 px-2.5 font-bold`}>
+                    {selectedRecord.status === "WO_PRESENT" ? "WO + PRESENT" : selectedRecord.status === "H_PRESENT" ? "H + PRESENT" : selectedRecord.status === "HD_CL" ? "HD + 0.5 CL" : selectedRecord.status.toUpperCase()}
+                  </span>
+                ) : selectedHoliday ? (
+                  <span className="badge badge-warning text-xs py-1 px-2.5 font-bold">HOLIDAY</span>
+                ) : selectedIsSunday ? (
+                  <span className="badge badge-neutral text-xs py-1 px-2.5">WEEK OFF (WO)</span>
+                ) : (
+                  <span className="badge badge-neutral text-xs py-1 px-2.5">NOT RECORDED</span>
+                )}
               </div>
             </div>
 
-            {/* Calendar */}
-            <div className="card p-5">
-              <div className="grid grid-cols-7 gap-1 mb-2">
-                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-                  <div key={d} className="text-center text-xs font-semibold text-gray-400 py-2">{d}</div>
-                ))}
-              </div>
-              <div className="grid grid-cols-7 gap-1">
-                {Array.from({ length: startDay }).map((_, i) => <div key={`empty-${i}`} />)}
-                {days.map((day) => {
-                  const dateStr = format(day, "yyyy-MM-dd");
-                  const record = getRecordForDate(dateStr);
-                  const isToday = dateStr === today;
-                  const isSunday = getDay(day) === 0;
-                  const holidayInfo = holidaysList.find((h) => h.date === dateStr);
-
-                  return (
-                    <motion.div
-                      key={dateStr}
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      onClick={() => handleDayClick(day)}
-                      className={`p-2 rounded-xl border transition-all cursor-pointer hover:border-blue-200 min-h-[70px]
-                        ${isToday ? "border-blue-300 bg-blue-50/50" : "border-transparent"}
-                        ${holidayInfo ? "bg-amber-50/40 border-amber-200/60" : record ? "bg-gray-50" : isSunday ? "bg-gray-50/30 text-gray-400" : "hover:bg-gray-50/50"}`}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className={`text-xs font-medium ${isToday ? "text-blue-600 font-bold" : isSunday ? "text-gray-400" : "text-gray-700"}`}>{format(day, "d")}</span>
-                        {record ? (
-                          record.status === "WO_PRESENT" ? (
-                            <div className="flex items-center gap-0.5">
-                              <span className="text-[8px] font-bold px-1 py-0.2 rounded border bg-gray-100 text-gray-600 border-gray-200">WO</span>
-                              <span className="text-[8px] font-bold px-1 py-0.2 rounded border bg-emerald-50 text-emerald-700 border-emerald-300">+ PRESENT</span>
-                            </div>
-                          ) : record.status === "H_PRESENT" ? (
-                            <div className="flex items-center gap-0.5">
-                              <span className="text-[8px] font-bold px-1 py-0.2 rounded border bg-amber-100 text-amber-800 border-amber-300">H</span>
-                              <span className="text-[8px] font-bold px-1 py-0.2 rounded border bg-emerald-50 text-emerald-700 border-emerald-300">+ PRESENT</span>
-                            </div>
-                          ) : record.status === "HD_CL" ? (
-                            <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full border bg-purple-100 text-purple-800 border-purple-300">
-                              HD + 0.5 CL
-                            </span>
-                          ) : (
-                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${STATUS_COLORS[record.status] || "bg-gray-100 text-gray-700"}`}>
-                              {record.status.toUpperCase()}
-                            </span>
-                          )
-                        ) : holidayInfo ? (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full border bg-amber-100 text-amber-800 border-amber-200">H</span>
-                        ) : isSunday ? (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full border bg-gray-50 text-gray-400 border-gray-100">WO</span>
-                        ) : null}
-                      </div>
-                      {holidayInfo && (
-                        <p className="text-[9px] font-semibold text-amber-800 truncate mb-0.5" title={holidayInfo.name}>
-                          🎉 {holidayInfo.name}
-                        </p>
-                      )}
-                      {(record?.status === "WO_PRESENT" || record?.status === "H_PRESENT") && (
-                        <span className="inline-block text-[8px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1 py-0.2 rounded mb-0.5">
-                          ⭐ +1 Comp Off
-                        </span>
-                      )}
-                      {record && (
-                        <div className="space-y-0.5">
-                          {record.inTime && <p className="text-[10px] text-gray-500">In: {record.inTime}</p>}
-                          {record.outTime && <p className="text-[10px] text-gray-500">Out: {record.outTime}</p>}
-                          {record.workingHours && parseFloat(record.workingHours) > 0 && <p className="text-[10px] text-gray-500 font-medium">{record.workingHours}h</p>}
-                          {(record.lateMinutes ?? 0) > 0 && <p className="text-[10px] text-red-500 font-semibold">{record.lateMinutes}m late</p>}
-                        </div>
-                      )}
-                    </motion.div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Leave Approvals Queue (Manager only) */}
-            {isManager && pendingLeaves.length > 0 && (
-              <div className="card p-5 border-l-4 border-amber-500">
-                <div className="flex items-center gap-2 mb-4">
-                  <AlertCircle className="w-5 h-5 text-amber-500" />
-                  <h3 className="font-semibold text-gray-900 text-sm">Pending Leave Requests</h3>
-                </div>
-                <div className="space-y-3">
-                  {pendingLeaves.map((leave) => (
-                    <div key={leave.id} className="p-4 bg-gray-50 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-gray-100">
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900">{leave.userName || "Employee"}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          Requested <span className="font-semibold text-purple-600">{leave.type}</span> from <span className="font-medium">{leave.startDate}</span> to <span className="font-medium">{leave.endDate}</span>
-                        </p>
-                        {leave.reason && <p className="text-xs italic text-gray-500 mt-1 bg-white p-2 rounded border border-gray-100">"${leave.reason}"</p>}
-                      </div>
-                      <div className="flex gap-2 self-end sm:self-center">
-                        <button onClick={() => handleReviewLeave(leave.id, "approved")} className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 flex items-center gap-1">
-                          <Check className="w-3.5 h-3.5" /> Approve
-                        </button>
-                        <button onClick={() => handleReviewLeave(leave.id, "rejected")} className="px-3 py-1.5 bg-red-50 text-red-600 border border-red-100 rounded-lg text-xs font-semibold hover:bg-red-100">
-                          Reject
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+            {selectedHoliday && (
+              <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200/70 text-xs text-amber-900 font-semibold flex items-center gap-2">
+                <span>🎉</span>
+                <span>Official Public Holiday: <b>{selectedHoliday.name}</b></span>
               </div>
             )}
 
-            {/* Attendance & Leave Logs Combined Table */}
-            <div className="card overflow-hidden">
-              <div className="px-5 py-3 border-b border-gray-100">
-                <h3 className="text-sm font-semibold text-gray-900">Leave Application History</h3>
+            {(selectedRecord?.status === "WO_PRESENT" || selectedRecord?.status === "H_PRESENT") && (
+              <div className="p-2.5 rounded-xl bg-indigo-50 border border-indigo-200 text-xs text-indigo-900 font-semibold flex items-center gap-2">
+                <span>⭐</span>
+                <span>Worked on Weekend/Holiday: <b>+1 Comp Off (CO) Earned</b></span>
               </div>
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50/50">
-                    <th className="text-left text-xs font-semibold text-gray-500 uppercase px-5 py-2.5">Leave Type</th>
-                    <th className="text-left text-xs font-semibold text-gray-500 uppercase px-5 py-2.5">Start Date</th>
-                    <th className="text-left text-xs font-semibold text-gray-500 uppercase px-5 py-2.5">End Date</th>
-                    <th className="text-left text-xs font-semibold text-gray-500 uppercase px-5 py-2.5">Reason</th>
-                    <th className="text-left text-xs font-semibold text-gray-500 uppercase px-5 py-2.5">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {historicalLeaves.length === 0 ? (
-                    <tr><td colSpan={5} className="text-center py-6 text-xs text-gray-400">No leave history</td></tr>
-                  ) : historicalLeaves.map((l) => (
-                    <tr key={l.id} className="border-b border-gray-50 hover:bg-gray-50/50 text-sm">
-                      <td className="px-5 py-3.5 font-medium text-purple-600">{l.type}</td>
-                      <td className="px-5 py-3.5 text-gray-600">{l.startDate}</td>
-                      <td className="px-5 py-3.5 text-gray-600">{l.endDate}</td>
-                      <td className="px-5 py-3.5 text-gray-500 max-w-xs truncate">{l.reason || "-"}</td>
-                      <td className="px-5 py-3.5">
-                        <span className={`px-2 py-1 rounded-lg text-xs font-semibold uppercase ${
-                          l.status === "approved" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"
-                        }`}>{l.status}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            )}
 
+            {selectedRecord ? (
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="p-2.5 bg-gray-50 rounded-xl">
+                  <span className="text-gray-400 text-[10px] block">Punch In Time</span>
+                  <span className="font-bold text-gray-900 text-sm">{selectedRecord.inTime || "--:--"}</span>
+                </div>
+                <div className="p-2.5 bg-gray-50 rounded-xl">
+                  <span className="text-gray-400 text-[10px] block">Punch Out Time</span>
+                  <span className="font-bold text-gray-900 text-sm">{selectedRecord.outTime || "--:--"}</span>
+                </div>
+                <div className="p-2.5 bg-gray-50 rounded-xl">
+                  <span className="text-gray-400 text-[10px] block">Working Hours</span>
+                  <span className="font-bold text-emerald-700 text-sm">{selectedRecord.workingHours ? `${selectedRecord.workingHours} hrs` : "0 hrs"}</span>
+                </div>
+                <div className="p-2.5 bg-gray-50 rounded-xl">
+                  <span className="text-gray-400 text-[10px] block">Late Duration</span>
+                  <span className={`font-bold text-sm ${(selectedRecord.lateMinutes ?? 0) > 0 ? "text-red-600" : "text-gray-700"}`}>
+                    {(selectedRecord.lateMinutes ?? 0) > 0 ? `${selectedRecord.lateMinutes} mins late` : "Ontime (0m)"}
+                  </span>
+                </div>
+                {selectedRecord.notes && (
+                  <div className="col-span-2 p-2 bg-blue-50/50 rounded-xl border border-blue-100 text-[11px] text-blue-950">
+                    <b>Notes:</b> {selectedRecord.notes}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400 text-center py-2">No punch in/out recorded for this date.</p>
+            )}
+
+            <button
+              onClick={() => openMarkAttendanceModalForDay(selectedDay)}
+              className="btn-primary w-full justify-center text-xs py-2"
+            >
+              {isManager ? "Edit / Override Day Status" : "Mark / Request Day Attendance"}
+            </button>
           </div>
         </div>
+
+        {/* ─── 2. MOBILE DAILY FEED / LIST VIEW ─── */}
+        <div className={`sm:hidden space-y-2.5 ${mobileView === "list" ? "block" : "hidden"}`}>
+          {days.slice().reverse().map((day) => {
+            const dateStr = format(day, "yyyy-MM-dd");
+            const record = getRecordForDate(dateStr);
+            const isSunday = getDay(day) === 0;
+            const holidayInfo = holidaysList.find((h) => h.date === dateStr);
+
+            return (
+              <div 
+                key={dateStr}
+                onClick={() => { setSelectedDay(day); openMarkAttendanceModalForDay(day); }}
+                className={`card p-3.5 transition-all cursor-pointer border ${
+                  record ? "border-gray-200 bg-white" : holidayInfo ? "border-amber-200 bg-amber-50/30" : isSunday ? "border-gray-100 bg-gray-50/40 text-gray-400" : "border-gray-100"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="text-center bg-gray-100 rounded-lg p-1.5 min-w-[38px]">
+                      <span className="text-[10px] font-bold text-gray-400 block uppercase leading-none">{format(day, "EEE")}</span>
+                      <span className="text-sm font-black text-gray-900 block leading-tight">{format(day, "d")}</span>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-gray-900">{format(day, "MMMM d, yyyy")}</p>
+                      {holidayInfo && <p className="text-[10px] font-semibold text-amber-700">🎉 {holidayInfo.name}</p>}
+                      {(record?.status === "WO_PRESENT" || record?.status === "H_PRESENT") && (
+                        <p className="text-[10px] font-bold text-indigo-700">⭐ +1 Comp Off Earned</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    {record ? (
+                      <span className={`badge ${STATUS_COLORS[record.status] || "badge-neutral"} text-[10px] font-bold`}>
+                        {record.status === "WO_PRESENT" ? "WO + PRESENT" : record.status === "H_PRESENT" ? "H + PRESENT" : record.status === "HD_CL" ? "HD 0.5 CL" : record.status.toUpperCase()}
+                      </span>
+                    ) : holidayInfo ? (
+                      <span className="badge badge-warning text-[10px]">HOLIDAY</span>
+                    ) : isSunday ? (
+                      <span className="badge badge-neutral text-[10px]">WEEK OFF</span>
+                    ) : (
+                      <span className="text-[10px] text-gray-300">--</span>
+                    )}
+                  </div>
+                </div>
+
+                {record && (
+                  <div className="grid grid-cols-3 gap-2 pt-2 border-t border-gray-100 text-[11px] text-gray-600">
+                    <div><span className="text-gray-400 block text-[9px]">In</span> <b className="text-gray-900">{record.inTime || "--"}</b></div>
+                    <div><span className="text-gray-400 block text-[9px]">Out</span> <b className="text-gray-900">{record.outTime || "--"}</b></div>
+                    <div><span className="text-gray-400 block text-[9px]">Hours</span> <b className="text-emerald-700">{record.workingHours ? `${record.workingHours}h` : "--"}</b></div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ─── 3. DESKTOP CALENDAR VIEW (Spacious, Multi-Column) ─── */}
+        <div className="hidden sm:block card p-5">
+          <div className="grid grid-cols-7 gap-1.5 mb-2">
+            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+              <div key={d} className="text-center text-xs font-bold text-gray-400 uppercase py-2">{d}</div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-1.5">
+            {Array.from({ length: startDay }).map((_, i) => <div key={`empty-${i}`} />)}
+            {days.map((day) => {
+              const dateStr = format(day, "yyyy-MM-dd");
+              const record = getRecordForDate(dateStr);
+              const isToday = dateStr === today;
+              const isSunday = getDay(day) === 0;
+              const holidayInfo = holidaysList.find((h) => h.date === dateStr);
+
+              return (
+                <motion.div
+                  key={dateStr}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  onClick={() => openMarkAttendanceModalForDay(day)}
+                  className={`p-2.5 rounded-xl border transition-all cursor-pointer hover:border-blue-300 min-h-[85px] flex flex-col justify-between
+                    ${isToday ? "border-blue-400 bg-blue-50/50 shadow-xs" : "border-gray-100"}
+                    ${holidayInfo ? "bg-amber-50/40 border-amber-200" : record ? "bg-white" : isSunday ? "bg-gray-50/40 text-gray-400" : "hover:bg-gray-50/50"}`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={`text-xs font-bold ${isToday ? "text-blue-600" : isSunday ? "text-gray-400" : "text-gray-800"}`}>{format(day, "d")}</span>
+                      {record ? (
+                        record.status === "WO_PRESENT" ? (
+                          <div className="flex items-center gap-0.5">
+                            <span className="text-[8px] font-bold px-1 py-0.2 rounded border bg-gray-100 text-gray-600 border-gray-200">WO</span>
+                            <span className="text-[8px] font-bold px-1 py-0.2 rounded border bg-emerald-50 text-emerald-700 border-emerald-300">+ PRESENT</span>
+                          </div>
+                        ) : record.status === "H_PRESENT" ? (
+                          <div className="flex items-center gap-0.5">
+                            <span className="text-[8px] font-bold px-1 py-0.2 rounded border bg-amber-100 text-amber-800 border-amber-300">H</span>
+                            <span className="text-[8px] font-bold px-1 py-0.2 rounded border bg-emerald-50 text-emerald-700 border-emerald-300">+ PRESENT</span>
+                          </div>
+                        ) : record.status === "HD_CL" ? (
+                          <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full border bg-purple-100 text-purple-800 border-purple-300">
+                            HD 0.5 CL
+                          </span>
+                        ) : (
+                          <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full border ${STATUS_COLORS[record.status] || "bg-gray-100 text-gray-700"}`}>
+                            {record.status.toUpperCase()}
+                          </span>
+                        )
+                      ) : holidayInfo ? (
+                        <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full border bg-amber-100 text-amber-800 border-amber-200">H</span>
+                      ) : isSunday ? (
+                        <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full border bg-gray-50 text-gray-400 border-gray-100">WO</span>
+                      ) : null}
+                    </div>
+
+                    {holidayInfo && (
+                      <p className="text-[9px] font-semibold text-amber-800 truncate mb-0.5" title={holidayInfo.name}>
+                        🎉 {holidayInfo.name}
+                      </p>
+                    )}
+                    {(record?.status === "WO_PRESENT" || record?.status === "H_PRESENT") && (
+                      <span className="inline-block text-[8px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1 py-0.2 rounded mb-0.5">
+                        ⭐ +1 Comp Off
+                      </span>
+                    )}
+                  </div>
+
+                  {record && (
+                    <div className="space-y-0.5 text-[10px] text-gray-500 pt-1 border-t border-gray-50">
+                      {record.inTime && <div className="flex justify-between"><span>In:</span> <b className="text-gray-800">{record.inTime}</b></div>}
+                      {record.outTime && <div className="flex justify-between"><span>Out:</span> <b className="text-gray-800">{record.outTime}</b></div>}
+                      {record.workingHours && parseFloat(record.workingHours) > 0 && (
+                        <div className="flex justify-between text-emerald-700 font-bold"><span>Total:</span> <span>{record.workingHours}h</span></div>
+                      )}
+                    </div>
+                  )}
+                </motion.div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Leave Approvals Queue (Manager only) */}
+        {isManager && pendingLeaves.length > 0 && (
+          <div className="card p-4 sm:p-5 border-l-4 border-amber-500">
+            <div className="flex items-center gap-2 mb-3">
+              <AlertCircle className="w-5 h-5 text-amber-500" />
+              <h3 className="font-semibold text-gray-900 text-sm">Pending Leave Requests</h3>
+            </div>
+            <div className="space-y-2.5">
+              {pendingLeaves.map((leave) => (
+                <div key={leave.id} className="p-3.5 bg-gray-50 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-gray-100">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">{leave.userName || "Employee"}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Requested <span className="font-semibold text-purple-600">{leave.type}</span> from <span className="font-medium">{leave.startDate}</span> to <span className="font-medium">{leave.endDate}</span>
+                    </p>
+                    {leave.reason && <p className="text-xs italic text-gray-500 mt-1 bg-white p-2 rounded border border-gray-100">"{leave.reason}"</p>}
+                  </div>
+                  <div className="flex gap-2 self-end sm:self-center">
+                    <button onClick={() => handleReviewLeave(leave.id, "approved")} className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 flex items-center gap-1">
+                      <Check className="w-3.5 h-3.5" /> Approve
+                    </button>
+                    <button onClick={() => handleReviewLeave(leave.id, "rejected")} className="px-3 py-1.5 bg-red-50 text-red-600 border border-red-100 rounded-lg text-xs font-semibold hover:bg-red-100">
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
       </div>
 
-      {/* Attendance Manual Mark Modal */}
+      {/* Mark/Edit Attendance Modal */}
       <AnimatePresence>
         {showModal && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowModal(false)}>
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="card p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center justify-between mb-5">
-                <h2 className="text-lg font-semibold text-gray-900">Mark Attendance / Override</h2>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 overflow-y-auto" onClick={() => setShowModal(false)}>
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="card p-5 sm:p-6 w-full max-w-md my-auto" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-base sm:text-lg font-semibold text-gray-900">Mark / Edit Attendance</h2>
                 <button onClick={() => setShowModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100"><X className="w-4.5 h-4.5 text-gray-500" /></button>
               </div>
               <form onSubmit={handleSubmit} className="space-y-3.5">
-                {isManager && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Employee</label>
-                    <select 
-                      value={form.userId || selectedEmployeeId} 
-                      onChange={(e) => setForm({ ...form, userId: e.target.value })} 
-                      className="input-field"
-                    >
-                      <option value={currentUser?.id}>Self ({currentUser?.name})</option>
-                      {employees.map((emp) => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
-                    </select>
-                  </div>
-                )}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                  <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className="input-field" required />
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Date</label>
+                  <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className="input-field text-sm" required />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                  <select 
-                    value={form.status} 
-                    onChange={(e) => setForm({ ...form, status: e.target.value })} 
-                    className="input-field font-semibold text-blue-600"
-                  >
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Attendance Status</label>
+                  <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className="input-field text-sm">
                     <option value="present">Present (Full Day)</option>
-                    <option value="half_day">Half Day (50% Day)</option>
-                    <option value="HD_CL">Half Day + 0.5 CL (Full Paid Day)</option>
-                    <option value="WO_PRESENT">Week Off + Present (WO + Present - Earns Comp Off)</option>
-                    <option value="H_PRESENT">Holiday + Present (H + Present - Earns Comp Off)</option>
+                    <option value="half_day">Half Day (Unpaid 0.5d)</option>
+                    <option value="HD_CL">Half Day + 0.5 CL Applied (Full Paid 1.0d)</option>
                     <option value="WO">Week Off (WO)</option>
+                    <option value="WO_PRESENT">WO + Present (+1 Comp Off Earned)</option>
+                    <option value="H">Public Holiday (H)</option>
+                    <option value="H_PRESENT">Holiday + Present (+1 Comp Off Earned)</option>
                     <option value="CL">Casual Leave (CL)</option>
-                    <option value="SL">Sick Leave (SL)</option>
-                    <option value="CO">Comp Off (CO)</option>
+                    {isCompOffEligible && <option value="CO">Comp Off (CO)</option>}
                     <option value="LOP">Loss of Pay (LOP)</option>
-                    <option value="H">Holiday (H)</option>
                     <option value="absent">Absent</option>
                   </select>
                 </div>
-                {!["WO", "CL", "SL", "CO", "LOP", "H", "absent"].includes(form.status) && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">In Time</label>
-                      <input type="time" value={form.inTime} onChange={(e) => setForm({ ...form, inTime: e.target.value })} className="input-field" required />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Out Time</label>
-                      <input type="time" value={form.outTime} onChange={(e) => setForm({ ...form, outTime: e.target.value })} className="input-field" required />
-                    </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">In Time</label>
+                    <input type="time" value={form.inTime} onChange={(e) => setForm({ ...form, inTime: e.target.value })} className="input-field text-sm" />
                   </div>
-                )}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
-                  <input type="text" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="input-field" />
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Out Time</label>
+                    <input type="time" value={form.outTime} onChange={(e) => setForm({ ...form, outTime: e.target.value })} className="input-field text-sm" />
+                  </div>
                 </div>
-                <button type="submit" className="btn-primary w-full justify-center">Save Status</button>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Notes / Reason</label>
+                  <input type="text" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="input-field text-sm" placeholder="Optional notes..." />
+                </div>
+                <button type="submit" className="btn-primary w-full justify-center text-sm py-2.5">Save Attendance</button>
               </form>
             </motion.div>
           </motion.div>
@@ -609,19 +812,19 @@ export default function AttendancePage() {
       {/* Leave Application Modal */}
       <AnimatePresence>
         {showLeaveModal && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowLeaveModal(false)}>
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="card p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center justify-between mb-5">
-                <h2 className="text-lg font-semibold text-gray-900">Apply for Leave</h2>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 overflow-y-auto" onClick={() => setShowLeaveModal(false)}>
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="card p-5 sm:p-6 w-full max-w-md my-auto" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-base sm:text-lg font-semibold text-gray-900">Apply for Leave</h2>
                 <button onClick={() => setShowLeaveModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100"><X className="w-4.5 h-4.5 text-gray-500" /></button>
               </div>
               <form onSubmit={handleLeaveSubmit} className="space-y-3.5">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Leave Type</label>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Leave Type</label>
                   <select 
                     value={leaveForm.type} 
                     onChange={(e) => setLeaveForm({ ...leaveForm, type: e.target.value })} 
-                    className="input-field font-medium text-gray-900"
+                    className="input-field text-sm font-medium text-gray-900"
                   >
                     <option value="CL">Casual Leave (CL) - {clBalance.available} day(s) left</option>
                     {isCompOffEligible && (
@@ -631,7 +834,7 @@ export default function AttendancePage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Leave Duration</label>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Leave Duration</label>
                   <div className="grid grid-cols-2 gap-2 bg-gray-50 p-1.5 rounded-xl border border-gray-200">
                     <button
                       type="button"
@@ -668,26 +871,25 @@ export default function AttendancePage() {
 
                 {leaveForm.type === "CL" && isHalfDay && (
                   <div className="p-2.5 rounded-lg bg-purple-50 border border-purple-100 text-xs text-purple-800">
-                    ⚡ <b>Half Day 0.5 CL:</b> Deducts only <b>0.5 CL</b> from your balance ({clBalance.available} CL available) and converts your worked half day into <b>1.0 Full Paid Day</b> (No salary deduction / No LOP!).
+                    ⚡ <b>Half Day 0.5 CL:</b> Deducts only <b>0.5 CL</b> from your balance ({clBalance.available} CL available) and gives <b>1.0 Full Paid Day</b>.
                   </div>
                 )}
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
-                    <input type="date" value={leaveForm.startDate} onChange={(e) => setLeaveForm({ ...leaveForm, startDate: e.target.value })} className="input-field" required />
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Start Date</label>
+                    <input type="date" value={leaveForm.startDate} onChange={(e) => setLeaveForm({ ...leaveForm, startDate: e.target.value })} className="input-field text-sm" required />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
-                    <input type="date" value={leaveForm.endDate} onChange={(e) => setLeaveForm({ ...leaveForm, endDate: e.target.value })} className="input-field" required />
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">End Date</label>
+                    <input type="date" value={leaveForm.endDate} onChange={(e) => setLeaveForm({ ...leaveForm, endDate: e.target.value })} className="input-field text-sm" required />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Reason for Leave</label>
-                  <textarea value={leaveForm.reason} onChange={(e) => setLeaveForm({ ...leaveForm, reason: e.target.value })} className="input-field min-h-[80px]" required placeholder="State your reason..." />
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Reason for Leave</label>
+                  <textarea value={leaveForm.reason} onChange={(e) => setLeaveForm({ ...leaveForm, reason: e.target.value })} className="input-field text-sm min-h-[70px]" required placeholder="State your reason..." />
                 </div>
-                <p className="text-xs text-gray-400">Note: Leave requests within available quota (CL or CO) are auto-approved. Other requests will be sent to the Super Admin for approval.</p>
-                <button type="submit" className="btn-primary w-full justify-center">Submit Request</button>
+                <button type="submit" className="btn-primary w-full justify-center text-sm py-2.5">Submit Request</button>
               </form>
             </motion.div>
           </motion.div>

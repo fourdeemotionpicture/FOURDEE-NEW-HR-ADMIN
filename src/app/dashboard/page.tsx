@@ -49,23 +49,23 @@ function KpiCard({ icon: Icon, label, value, sub, color, delay }: {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.4 }}
-      className="kpi-card"
+      className="kpi-card p-3 sm:p-5"
     >
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-sm font-medium text-gray-500 mb-1">{label}</p>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] sm:text-sm font-medium text-gray-500 mb-0.5 sm:mb-1 truncate">{label}</p>
           <motion.p
             initial={{ opacity: 0, scale: 0.5 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: delay + 0.1, duration: 0.3 }}
-            className="text-2xl font-bold text-gray-900"
+            className="text-base sm:text-2xl font-bold text-gray-900 truncate"
           >
             {value}
           </motion.p>
-          {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
+          {sub && <p className="text-[9px] sm:text-xs text-gray-400 mt-0.5 sm:mt-1 truncate">{sub}</p>}
         </div>
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${color}`}>
-          <Icon className="w-5 h-5" />
+        <div className={`w-7 h-7 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 ${color}`}>
+          <Icon className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
         </div>
       </div>
     </motion.div>
@@ -146,7 +146,7 @@ export default function DashboardPage() {
         {/* KPI Cards */}
         {isEmployee ? (
           /* Employee / Office Admin Dashboard Views (Personal Stats + Salary details) */
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
             <KpiCard icon={IndianRupee} label="Monthly Salary (Base)" value={`₹${parseFloat(data?.employeeSalary?.monthlySalary ?? "0").toLocaleString()}`} color="bg-emerald-50 text-emerald-600" delay={0} />
             <KpiCard icon={Wallet} label="Estimated Payable Salary" value={`₹${parseFloat(data?.employeeSalary?.estimatedPayable ?? "0").toLocaleString()}`} sub="Based on attendance so far" color="bg-blue-50 text-blue-600" delay={0.05} />
             <KpiCard icon={UserCheck} label="My Present Days" value={data?.personalStats?.presentDays ?? 0} color="bg-emerald-50 text-emerald-600" delay={0.1} />
@@ -157,7 +157,7 @@ export default function DashboardPage() {
           </div>
         ) : (
           /* Admin / Super Admin / Owner Admin Dashboard Views (Admin stats + Salary, no petty cash) */
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
             <KpiCard icon={Users} label="Total Employees" value={data?.totalEmployees ?? 0} color="bg-blue-50 text-blue-600" delay={0} />
             <KpiCard icon={UserCheck} label="Present Today" value={data?.presentToday ?? 0} sub={`${data?.todayWorkingHours ?? 0} hrs worked`} color="bg-emerald-50 text-emerald-600" delay={0.05} />
             <KpiCard icon={UserX} label="Absent Today" value={data?.absentToday ?? 0} color="bg-red-50 text-red-600" delay={0.1} />
